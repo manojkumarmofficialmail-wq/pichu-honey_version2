@@ -208,20 +208,24 @@ const level = {
 
   beginTutorial() {
     showTitle('Level 1', 'Agasthya Hills', 'Train with Ranger Ammini, then chase the poachers up the mountain', 'അഗസ്ത്യമല');
-    setObjective('Hit the training dummy — tap attack 3 times fast for a combo!'); L.tut = 0; L.tutHits = 0;
+    L.tut = 0; L.tutHits = 0; L.tutT = 0; L.tips = {}; this.tutObjective();
+    document.body.classList.add('tutorial');
   },
+  tutObjective() { setObjective(`Walk to the straw dummy and HIT it! (${L.tutHits}/3)`); },
+  // simple training: any 3 hits on the dummy (stick, smash or slingshot)
   tutorialHit(o) {
     if (G.stage !== 0) return;
-    L.tutHits++;
-    if (L.tut === 0 && o.combo === 2) { L.tut = 1; sfx.collect(); dialog('Ranger Ammini', 'Great combo! Now HOLD the smash button and let go for a power hit!', 4); setObjective('Hold K (or 💥) to charge, release to SMASH the dummy'); }
-    else if (L.tut === 0 && L.tutHits === 4) dialog('Ranger Ammini', 'Press attack three times quickly — the third hit is the strongest!', 3.5);
-    else if (L.tut === 1 && o.heavy) { L.tut = 2; sfx.collect(); dialog('Ranger Ammini', 'Wow! Now try your slingshot from far away.', 3.5); setObjective('Step back and hit the dummy with your slingshot (F / right-click / 🎯)'); }
-    else if (L.tut === 2 && o.ranged) {
-      L.tut = 3; G.stage = 1; sfx.big(); L.gates.g1.openUp(); L.cp.set(pathX(G1Z - 2), height(pathX(G1Z - 2), G1Z - 2), G1Z - 2);
-      dialog('Ranger Ammini', 'Perfect! Remember: roll away from attacks with DODGE, and when you are surrounded, ask Honey to BARK. Go, little hero!', 6);
+    L.tutHits++; sfx.collect(); popText(`⚔️ ${L.tutHits}/3`); this.tutObjective();
+    if (L.tutHits === 1) dialog('Ranger Ammini', 'Yes! Just like that! Hit it again!', 2.5);
+    if (L.tutHits >= 3) {
+      G.stage = 1; sfx.big(); L.gates.g1.openUp(); L.cp.set(pathX(G1Z - 2), height(pathX(G1Z - 2), G1Z - 2), G1Z - 2);
+      document.body.classList.remove('tutorial'); setPrompt('');
+      dialog('Ranger Ammini', 'Well done, little hero! The gate is open. Go and find Mittu — I\'ll call you on the radio with tips!', 5);
       setObjective('Follow the red trail north and stop the poachers');
     }
   },
+  // one-time tips that appear when a move becomes useful
+  tip(id, text) { if (L.tips[id]) return; L.tips[id] = true; dialog('Ranger Ammini (radio)', text, 5.5); },
 
   bossHelpers() { [[-6, 4, 'grunt'], [6, 4, 'grunt'], [0, 9, 'slinger']].forEach(([dx, dz, t]) => { const e = new Enemy(t, AR.x + dx, AR.z + dz, L.root, { group: 98, awake: true, drops: true }); emit(TEX.puff, new THREE.Vector3(e.x, e.y + .5, e.z), 10, { color: 0x999999, size: .8, speed: 2, g: 0, life: .8 }); }); },
 
@@ -311,7 +315,21 @@ const level = {
     // music follows the action
     if (!L.bossOn && G.stage < 4) { let fighting = false; for (const e of ENEMIES) if (e.alive && e.awake && !e.prop && Math.hypot(e.x - P.pos.x, e.z - P.pos.z) < 16) { fighting = true; break; } MUS.mood = fighting ? 'battle' : 'forest'; }
     // prompts
-    const c = this.nearCage(); setPrompt(c ? (matchMedia('(pointer:coarse)').matches ? 'Tap ✋ to free the animal' : 'Press E to free the animal') : '');
+    const mob = matchMedia('(pointer:coarse)').matches;
+    if (G.stage === 0) {
+      const dd = Math.hypot(P.pos.x - DUMMY.x, P.pos.z - DUMMY.z); L.tutT += dt;
+      setPrompt(dd < 3.2 ? (mob ? 'Tap the big red ⚔️ button to hit!' : 'Press J or CLICK the mouse to hit! ⚔️') : '');
+      if (L.tutT > 25 && L.tutHits === 0 && !L.tutHelp) { L.tutHelp = true; dialog('Ranger Ammini', mob ? 'Walk up close to the straw dummy, then tap the big red ⚔️ button!' : 'Walk up close to the straw dummy with W A S D, then press J or click!', 5); }
+    } else {
+      const c = this.nearCage(); setPrompt(c ? (mob ? 'Tap ✋ to free the animal' : 'Press E to free the animal') : '');
+      // just-in-time tips
+      let near = 0, sling = false, brute = false; for (const e of ENEMIES) if (e.alive && e.awake && !e.prop && Math.hypot(e.x - P.pos.x, e.z - P.pos.z) < 10) { near++; if (e.type === 'slinger') sling = true; }
+      if (near >= 1) this.tip('smash', mob ? 'Tip: HOLD the orange 💥 button and let go for a POWER SMASH!' : 'Tip: HOLD K and let go for a POWER SMASH!');
+      else if (L.tips.smash && near === 0 && G.kos >= 2) this.tip('combo', 'Tip: hit three times quickly — the third hit is the strongest!');
+      if (near >= 3) this.tip('bark', mob ? 'Tip: lots of poachers? Tap 🐶 BARK — Honey makes them dizzy!' : 'Tip: lots of poachers? Press H — Honey BARKS and makes them dizzy!');
+      if (sling) this.tip('sling', mob ? 'Tip: that one throws stones! Tap 🎯 to hit him with your slingshot!' : 'Tip: that one throws stones! Press F or RIGHT-click for your slingshot!');
+      if (P.hp < P.maxHp * .6 && near) this.tip('dodge', mob ? 'Tip: when a poacher glows RED, tap 🌀 to roll away!' : 'Tip: when a poacher glows RED, press L to roll away!');
+    }
     if (G.stage <= 3) this.objective();
     // lake sounds + birds
     if (AU.ctx) {
