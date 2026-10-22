@@ -23,7 +23,8 @@ export function showTitle(small, big, sub, ml) {
 }
 export function fade(on) { $('fade').style.opacity = on ? 1 : 0; }
 let promptOn = '';
-export function setPrompt(t) { if (t === promptOn) return; promptOn = t; $('prompt').style.display = t ? 'block' : 'none'; $('prompt').textContent = t; $('bAct').classList.toggle('show', !!t); }
+// showAct: also show the ✋ action button (only when there is something to free / talk to)
+export function setPrompt(t, showAct = true) { $('bAct').classList.toggle('show', !!t && showAct); if (t === promptOn) return; promptOn = t; $('prompt').style.display = t ? 'block' : 'none'; $('prompt').textContent = t; }
 
 let objText = '';
 export function setObjective(t) { if (t === objText) return; objText = t; $('objective').textContent = t; }

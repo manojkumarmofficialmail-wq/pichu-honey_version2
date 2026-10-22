@@ -3,7 +3,7 @@
 // rocky shola climb → Captain Snare on the plateau below Agasthyakoodam peak.
 import { THREE, std, M, B, CY, jitter, hsl, TEX } from '../core/engine.js';
 import { G, P, W, CC, CAM } from '../core/state.js';
-import { PI, TAU, clamp, lerp, smooth, fbm, vnoise, seed, sr, srnd, rand, pick, Q, DV } from '../core/utils.js';
+import { PI, TAU, clamp, lerp, smooth, fbm, vnoise, seed, sr, srnd, rand, pick, Q, DV, MOBILE } from '../core/utils.js';
 import { sfx, AU, MUS, panOf } from '../core/audio.js';
 import { dialog, setObjective, setPrompt, popText, showTitle, hud, bossBar } from '../core/ui.js';
 import { runCine } from '../core/cine.js';
@@ -27,7 +27,7 @@ const pathX = z => Math.sin(z * .02) * 11 + Math.sin(z * .05 + 1.3) * 4;
 const shoreX = z => -22 + Math.sin(z * .045) * 5;
 const START = { x: pathX(118), z: 118 };
 const HUT = { x: START.x + 7.5, z: 121 };
-const DUMMY = { x: START.x - 3.2, z: 112 };
+const DUMMY = { x: START.x - .4, z: START.z - 4.6 };   // right in front of Pichu: no walking needed to train
 const CAMP = { x: pathX(8), z: 8 };
 const AR = { x: pathX(-97), z: -97, r: 13 };
 const PK = { x: AR.x + 2, z: AR.z - 25 };
@@ -166,7 +166,7 @@ const level = {
     L.ranger.root.position.set(START.x + 2.6, H_START, START.z - 4.5); L.ranger.root.rotation.y = -PI * .7; root.add(L.ranger.root);
     // Honey's puppies at the post: Mittu (blue bandana) and her brother & sister
     L.pups = [makePuppy(0x3a8ad8), makePuppy(0xd84a8a), makePuppy(0x4ac86a)];
-    L.pups.forEach((p, i) => { p.root.position.set(START.x - 1.5 + i * .9, H_START, START.z - 4.5 - (i % 2) * .5); p.root.rotation.y = rand(0, TAU); root.add(p.root); });
+    L.pups.forEach((p, i) => { p.root.position.set(START.x - 3.2 + i * .9, H_START, START.z - 4.5 - (i % 2) * .5); p.root.rotation.y = rand(0, TAU); root.add(p.root); });
     L.thief = makeHuman({ shirt: 0x6b6a3a, pants: 0x2f3a2a, hat: 'cap', hatCol: 0x3a4a2a, weapon: 'none' }); L.thief.root.visible = false; root.add(L.thief.root);
     L.clue = new Clue(root, CAMP.x + 2, CAMP.z - 12.5, 'bell', () => { dialog('Pichu', "Mittu's bell! She WAS here! Honey, they must have taken her further north…", 4.5); HN.bark = 1; this.checkCamp(); this.objective(); });
     L.ticks.push(L.clue);
@@ -316,10 +316,10 @@ const level = {
     // music follows the action
     if (!L.bossOn && G.stage < 4) { let fighting = false; for (const e of ENEMIES) if (e.alive && e.awake && !e.prop && Math.hypot(e.x - P.pos.x, e.z - P.pos.z) < 16) { fighting = true; break; } MUS.mood = fighting ? 'battle' : 'forest'; }
     // prompts
-    const mob = matchMedia('(pointer:coarse)').matches;
+    const mob = MOBILE;
     if (G.stage === 0) {
       const dd = Math.hypot(P.pos.x - DUMMY.x, P.pos.z - DUMMY.z); L.tutT += dt;
-      setPrompt(dd < 4.5 ? (mob ? 'Tap the big red ⚔️ button to hit!' : 'Press J or CLICK the mouse to hit! ⚔️') : (mob ? 'Walk to the straw dummy 👈 (use the left side of the screen)' : 'Walk to the straw dummy with W A S D'));
+      setPrompt(dd < 4.5 ? (mob ? 'Tap the big red ⚔️ button ↘ to hit the dummy!' : 'Press J or CLICK the mouse to hit! ⚔️') : (mob ? 'Walk back to the straw dummy (drag on the left side)' : 'Walk to the straw dummy with W A S D'), false);
       // forgiving training: any attack near the dummy counts, even if the swing missed
       const A = P.act && ['light', 'heavy', 'sling'].includes(P.act.type) ? P.act : null;
       if (A !== L.curAct) {

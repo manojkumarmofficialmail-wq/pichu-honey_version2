@@ -21,7 +21,7 @@ export function vnoise(x, y) { const xi = Math.floor(x), yi = Math.floor(y), xf 
 export function fbm(x, y) { let s = 0, a = .5, f = 1; for (let i = 0; i < 4; i++) { s += a * vnoise(x * f, y * f); f *= 2.03; a *= .5; } return s; }
 
 export const params = new URLSearchParams(location.search);
-export const MOBILE = matchMedia('(pointer:coarse)').matches || /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
+export const MOBILE = params.has('mobile') || matchMedia('(pointer:coarse)').matches || /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
 export const Q = MOBILE
   ? { grass: 14000, trees: .6, shadow: 1024, bloom: false, pr: 1.35, cull: 60 }
   : { grass: 36000, trees: 1, shadow: 2048, bloom: true, pr: 1.6, cull: 85 };
