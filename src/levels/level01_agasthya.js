@@ -215,6 +215,7 @@ const level = {
   // simple training: any 3 hits on the dummy (stick, smash or slingshot)
   tutorialHit(o) {
     if (G.stage !== 0) return;
+    if (L.curAct) L.curAct.counted = true;
     L.tutHits++; sfx.collect(); popText(`⚔️ ${L.tutHits}/3`); this.tutObjective();
     if (L.tutHits === 1) dialog('Ranger Ammini', 'Yes! Just like that! Hit it again!', 2.5);
     if (L.tutHits >= 3) {
@@ -318,7 +319,18 @@ const level = {
     const mob = matchMedia('(pointer:coarse)').matches;
     if (G.stage === 0) {
       const dd = Math.hypot(P.pos.x - DUMMY.x, P.pos.z - DUMMY.z); L.tutT += dt;
-      setPrompt(dd < 3.2 ? (mob ? 'Tap the big red ⚔️ button to hit!' : 'Press J or CLICK the mouse to hit! ⚔️') : '');
+      setPrompt(dd < 4.5 ? (mob ? 'Tap the big red ⚔️ button to hit!' : 'Press J or CLICK the mouse to hit! ⚔️') : (mob ? 'Walk to the straw dummy 👈 (use the left side of the screen)' : 'Walk to the straw dummy with W A S D'));
+      // forgiving training: any attack near the dummy counts, even if the swing missed
+      const A = P.act && ['light', 'heavy', 'sling'].includes(P.act.type) ? P.act : null;
+      if (A !== L.curAct) {
+        const prev = L.curAct; L.curAct = A;
+        if (prev && !prev.counted && prev.phase !== 'charge') {
+          if (prev.near) { const d = L.dummy; d.wv += 3; this.tutorialHit({ assist: true }); }
+          else if (!L.farMsgT || L.farMsgT < 0) { L.farMsgT = 4; dialog('Ranger Ammini', 'Too far away! Walk right up to the straw dummy, then hit it.', 3); }
+        }
+        if (A) A.near = dd < 4.5;
+      }
+      L.farMsgT = (L.farMsgT || 0) - dt;
       if (L.tutT > 25 && L.tutHits === 0 && !L.tutHelp) { L.tutHelp = true; dialog('Ranger Ammini', mob ? 'Walk up close to the straw dummy, then tap the big red ⚔️ button!' : 'Walk up close to the straw dummy with W A S D, then press J or click!', 5); }
     } else {
       const c = this.nearCage(); setPrompt(c ? (mob ? 'Tap ✋ to free the animal' : 'Press E to free the animal') : '');
