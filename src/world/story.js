@@ -31,6 +31,7 @@ function clueModel(kind) {
   const g = new THREE.Group();
   if (kind === 'bell') { M(new THREE.SphereGeometry(.12, 12, 8, 0, TAU, 0, PI * .6), std(0xf2c230, { metalness: .8, roughness: .25 }), 0, .05, 0, g); M(new THREE.TorusGeometry(.13, .02, 6, 16), std(0x3a8ad8), 0, .14, 0, g).rotation.x = PI / 2; }
   else if (kind === 'blanket') { const m = M(new THREE.BoxGeometry(.45, .04, .35), std(0x3a8ad8, { roughness: 1 }), 0, 0, 0, g); m.rotation.z = .2; M(new THREE.BoxGeometry(.46, .045, .06), std(0xffffff), 0, .005, .08, g); }
+  else if (kind === 'toy') { const o = std(0xff8a20, { roughness: .5 }); M(new THREE.CapsuleGeometry(.04, .22, 4, 8), o, 0, .06, 0, g).rotation.z = PI / 2; for (const s of [-1, 1]) for (const u of [-1, 1]) M(S(.05, 8, 6), o, s * .15, .06 + u * .03, 0, g); }
   else { M(new THREE.BoxGeometry(.16, .26, .08), std(0x222222, { roughness: .5 }), 0, .13, 0, g); M(new THREE.CylinderGeometry(.012, .012, .2, 5), std(0x444444), .05, .34, 0, g); M(S(.025, 6, 5), new THREE.MeshBasicMaterial({ color: 0xff3030 }), -.04, .22, .045, g); }
   const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.glow, color: 0x8ad0ff, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: .8 })); gl.scale.setScalar(1.4); gl.position.y = .15; g.add(gl);
   return g;

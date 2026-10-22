@@ -20,7 +20,7 @@ export function tryFreeCage(L, busy) {
   const c = nearCage(L); if (!c) return false;
   if (busy(c)) { dialog('Pichu', 'The poachers are still watching! I have to beat them first.', 2.5); return true; }
   c.open(); hud();
-  popText({ squirrel: '🐿️ Giant squirrel freed!', tahr: '🐐 Nilgiri tahr freed!', calf: '🐘 Baby elephant freed!' }[c.kind] || '🦌 Deer freed!');
+  popText({ squirrel: '🐿️ Giant squirrel freed!', tahr: '🐐 Nilgiri tahr freed!', calf: '🐘 Baby elephant freed!', macaque: '🐒 Lion-tailed macaque freed!' }[c.kind] || '🦌 Deer freed!');
   dialog('Pichu', pick(["Run, little one! You're free!", 'Go home to your family!', 'Nobody will trap you again!']), 2.5);
   return true;
 }

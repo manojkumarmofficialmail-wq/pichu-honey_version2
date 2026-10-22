@@ -262,7 +262,7 @@ const level = {
   nearCage() { for (const c of L.cages) if (!c.free && Math.hypot(P.pos.x - c.x, P.pos.z - c.z) < 2.8) return c; return null; },
 
   startBoss() {
-    L.walled = true; G.stage = 4; L.cp.set(AR.x, H_AR, AR.z + 9); this.objective();
+    L.walled = true; P.pos.set(AR.x, W.height(AR.x, AR.z + 5), AR.z + 5); P.yaw = PI; CAM.yaw = 0; G.stage = 4; L.cp.set(AR.x, H_AR, AR.z + 9); this.objective();
     // a rock slide closes the way back
     const g = new THREE.Group(); g.position.set(pathX(WALLZ), height(pathX(WALLZ), WALLZ), WALLZ); L.root.add(g);
     for (let i = 0; i < 12; i++) M(jitter(new THREE.DodecahedronGeometry(sr(.9, 1.6), 1), .3), std(0x7a7670, { flatShading: true }), sr(-6, 6), sr(0, 1.5), sr(-1, 1), g);

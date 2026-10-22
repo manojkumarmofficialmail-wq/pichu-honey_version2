@@ -142,8 +142,11 @@ export const waterNormal = shared((() => {
 export function signTex(text, sub, bg = '#8a5a32') {
   return canvasTex(256, 110, g => {
     g.fillStyle = bg; g.fillRect(0, 0, 256, 110); g.strokeStyle = '#3a2410'; g.lineWidth = 10; g.strokeRect(5, 5, 246, 100);
-    g.fillStyle = '#fff3d6'; g.textAlign = 'center'; g.font = 'bold 40px Fredoka, Arial'; g.fillText(text, 128, 56);
-    if (sub) { g.font = '22px Fredoka, Arial'; g.fillText(sub, 128, 92); }
+    g.fillStyle = '#fff3d6'; g.textAlign = 'center';
+    // shrink the font until the text fits on the board
+    const fit = (t, size, bold, y) => { let s = size; do { g.font = `${bold ? 'bold ' : ''}${s}px Fredoka, "Noto Sans Malayalam", Arial`; s -= 2; } while (g.measureText(t).width > 232 && s > 10); g.fillText(t, 128, y); };
+    fit(text, 40, true, 56);
+    if (sub) fit(sub, 22, false, 92);
   });
 }
 export { PI, TAU };

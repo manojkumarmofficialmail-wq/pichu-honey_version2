@@ -106,6 +106,24 @@ export function elephantWalker(root, pts, scale = 1, speed = 1.1) {
   };
 }
 
+/* ---------- lion-tailed macaque (black fur, silver mane, tufted tail) ---------- */
+export function makeMacaque(scale = 1) {
+  const g = new THREE.Group(), blk = std(0x161414, { roughness: .95 }), mane = std(0xc8c4bc, { roughness: 1 }), face = std(0x3a2a24, { roughness: .8 });
+  const body = M(S(.16, 10, 8), blk, 0, .32, 0, g); body.scale.set(.9, 1.1, .85);
+  const head = new THREE.Group(); head.position.set(0, .55, .05); g.add(head);
+  M(S(.15, 12, 10), mane, 0, 0, -.02, head).scale.set(1.2, 1.15, .7); M(S(.09, 10, 8), face, 0, 0, .06, head);
+  for (const s of [-1, 1]) M(S(.018, 6, 5), std(0xe8c070), s * .035, .02, .14, head);
+  const arms = []; for (const s of [-1, 1]) { const a = new THREE.Group(); a.position.set(s * .13, .42, 0); g.add(a); M(C(.035, .2, 3, 6), blk, 0, -.12, 0, a); arms.push(a); const l = M(C(.04, .16, 3, 6), blk, s * .08, .12, .02, g); }
+  const tail = new THREE.Group(); tail.position.set(0, .25, -.13); g.add(tail); M(C(.02, .45, 3, 6), blk, 0, .1, -.2, tail).rotation.x = -1.1; M(S(.05, 6, 5), blk, 0, .02, -.43, tail);
+  g.scale.setScalar(scale); g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  return { root: g, head, arms, tail };
+}
+// macaques hopping between branches high in the trees
+export function macaqueTroop(root, trees) {
+  const L2 = trees.map((tr, i) => { const m = makeMacaque(1); root.add(m.root); return { m, tr, ph: rand(0, 6.3), hop: rand(3, 8) }; });
+  return { tick(dt, t) { for (const a of L2) { a.hop -= dt; if (a.hop < 0) { a.hop = rand(4, 9); a.tr = trees[(trees.indexOf(a.tr) + 1 + (Math.random() * (trees.length - 1) | 0)) % trees.length]; } const x = a.tr.x + Math.sin(a.ph) * .8, z = a.tr.z + Math.cos(a.ph) * .8; const p = a.m.root.position; p.x = damp(p.x, x, 2, dt); p.z = damp(p.z, z, 2, dt); p.y = damp(p.y, W.height(x, z) + a.tr.h, 2, dt) + (a.hop > 3.6 ? 0 : 0); a.m.root.rotation.y = Math.sin(t * .3 + a.ph) * 1.5; a.m.arms.forEach((ar, i) => ar.rotation.x = Math.sin(t * 2 + a.ph + i) * .3); a.m.tail.rotation.z = Math.sin(t + a.ph) * .3; } } };
+}
+
 /* ---------- tiger stripes ---------- */
 export const tigerTex = canvasTex(256, 256, g => {
   g.fillStyle = '#e08a2a'; g.fillRect(0, 0, 256, 256); g.fillStyle = '#1a120a';

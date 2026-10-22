@@ -2,7 +2,7 @@
 // South → north: boat landing → bamboo raft across the lake (drones!) → island rescue →
 // north shore with an elephant herd and a tiger → poacher outpost → the Jeep Trapper's clearing.
 import { THREE, std, M, jitter, hsl, TEX } from '../core/engine.js';
-import { G, P, W, CC } from '../core/state.js';
+import { G, P, W, CC, CAM } from '../core/state.js';
 import { PI, TAU, clamp, lerp, smooth, fbm, vnoise, seed, sr, srnd, rand, pick, Q } from '../core/utils.js';
 import { sfx, AU, MUS } from '../core/audio.js';
 import { dialog, setObjective, popText, showTitle, hud, bossBar } from '../core/ui.js';
@@ -238,7 +238,7 @@ const level = {
   },
 
   startBoss() {
-    L.walled = true; G.stage = 7; setCP(L, AR.x, AR.z + 12); this.objective();
+    L.walled = true; P.pos.set(AR.x, W.height(AR.x, AR.z + 5), AR.z + 5); P.yaw = PI; CAM.yaw = 0; G.stage = 7; setCP(L, AR.x, AR.z + 12); this.objective();
     const g = new THREE.Group(); g.position.set(pathX(WALLZ), height(pathX(WALLZ), WALLZ), WALLZ); L.root.add(g);
     for (let i = 0; i < 12; i++) M(jitter(new THREE.DodecahedronGeometry(sr(.9, 1.6), 1), .3), std(0x6a4a30, { flatShading: true }), sr(-6, 6), sr(0, 1.2), sr(-1, 1), g);
     sfx.smash(); G.shake = .4;

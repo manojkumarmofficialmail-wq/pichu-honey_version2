@@ -15,7 +15,7 @@ import { ENEMIES, HOOKS, landHit, damagePlayer, spawnProjectile } from './combat
 import { bossBar, dialog } from '../core/ui.js';
 import { Drone } from './drone.js';
 
-class BossBase {
+export class BossBase {
   constructor(root, x, z, o) {
     this.root = root; this.boss = true; this.x = x; this.z = z; this.y = W.height(x, z); this.yaw = o.yaw ?? 0;
     this.radius = .7; this.chest = 1.5; this.tall = .6; this.alive = true; this.awake = false; this.group = 99;

@@ -27,7 +27,7 @@ export function doBark() {
   HN.barkCD = upg.barkCD(); HN.bark = 1; setBarkPose(); sfx.bigBark(); buzz([30, 30, 60]); G.shake = Math.max(G.shake, .2);
   ring(HN.pos, 13, 0xffd36a, .6); ring(HN.pos, 9, 0xffffff, .45);
   let n = 0;
-  for (const e of ENEMIES) { if (!e.alive || e.friendly || e.prop) continue; const d = Math.hypot(e.x - HN.pos.x, e.z - HN.pos.z); if (d < upg.barkR()) { e.stunFor(e.boss ? 1.2 : 2.4); n++; } }
+  for (const e of ENEMIES) { if (!e.alive || e.prop || (e.friendly && !e.revealable)) continue; const d = Math.hypot(e.x - HN.pos.x, e.z - HN.pos.z) * (e.revealable && e.friendly ? .6 : 1); if (d < upg.barkR()) { e.stunFor(e.boss ? 1.2 : 2.4); n++; } }
   if (n >= 2) dialog('Pichu', 'Good girl, Honey! They\'re dizzy! Get them!', 2);
 }
 

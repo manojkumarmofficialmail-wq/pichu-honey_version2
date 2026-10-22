@@ -9,7 +9,7 @@ import { emit, ring } from './particles.js';
 import { ENEMIES, landHit } from '../combat/combat.js';
 import { spawnPickup } from './pickups.js';
 import { makeQuad, animQuad, QUADS } from '../actors/quad.js';
-import { makeElephant, animElephant, tigerTex } from './props2.js';
+import { makeElephant, animElephant, tigerTex, makeMacaque } from './props2.js';
 
 const at = (root, x, z, ry = 0) => { const g = new THREE.Group(); g.position.set(x, W.height(x, z), z); g.rotation.y = ry; root.add(g); return g; };
 
@@ -100,7 +100,7 @@ export function makeSquirrel() {
 export class Cage {
   constructor(root, x, z, kind = 'spotted', ry = 0) {
     this.x = x; this.z = z; this.kind = kind; this.free = false; this.t = 0; this.g = at(root, x, z, ry); this.root = root;
-    const bm = std(0x4a3a2a, { roughness: .8 }), w = kind === 'squirrel' ? .9 : 1.9, d = kind === 'squirrel' ? .9 : 2.2, h = kind === 'squirrel' ? .9 : kind === 'calf' ? 1.6 : 1.7;
+    const small = kind === 'squirrel' || kind === 'macaque', bm = std(0x4a3a2a, { roughness: .8 }), w = small ? 1.1 : 1.9, d = small ? 1.1 : 2.2, h = kind === 'squirrel' ? .9 : kind === 'calf' ? 1.6 : 1.7;
     this.bars = [];
     M(B(w + .1, .1, d + .1), bm, 0, .05, 0, this.g); const top = M(B(w + .1, .1, d + .1), bm, 0, h, 0, this.g); this.bars.push(top);
     for (let i = 0; i <= 6; i++) for (const s of [-1, 1]) { const b = M(CY(.025, .025, h, 5), bm, -w / 2 + i * w / 6, h / 2, s * d / 2, this.g); this.bars.push(b); }
@@ -108,6 +108,7 @@ export class Cage {
     const lock = M(B(.14, .18, .08), std(0xc9a020, { metalness: .7, roughness: .3 }), 0, h * .55, d / 2 + .05, this.g); this.bars.push(lock);
     if (kind === 'squirrel') { this.animal = makeSquirrel(); this.animal.root.position.y = .1; this.g.add(this.animal.root); }
     else if (kind === 'calf') { this.ele = makeElephant(.4); this.g.add(this.ele.root); this.animal = this.ele; }
+    else if (kind === 'macaque') { this.mac = makeMacaque(1.1); this.g.add(this.mac.root); this.animal = this.mac; }
     else { this.q = makeQuad(QUADS[kind]); if (kind === 'sambar') this.q.root.scale.setScalar(.75); this.g.add(this.q.root); this.animal = this.q; }
     this.vel = this.bars.map(() => new THREE.Vector3(rand(-3, 3), rand(3, 6), rand(-3, 3)));
     addBox(x - w / 2 - .1, z - d / 2 - .1, x + w / 2 + .1, z + d / 2 + .1); this.box = { w, d };
@@ -124,6 +125,7 @@ export class Cage {
     if (!this.free) {
       if (this.q) animQuad(this.q, dt, 0, Math.sin(t * .5 + this.x) > .6 ? 'alert' : 'lie', t, { wag: .1 });
       else if (this.ele) animElephant(this.ele, dt, 0, t);
+      else if (this.mac) { this.mac.arms.forEach((a, i) => a.rotation.x = -2.6 + Math.sin(t * 6 + i * 3) * .3); this.mac.head.rotation.y = Math.sin(t * 2) * .5; }
       else this.animal.tail.rotation.x = -.4 + Math.sin(t * 2) * .1;
       return;
     }
@@ -138,6 +140,7 @@ export class Cage {
       a.position.y = W.height(wx, wz) - this.g.position.y + (this.kind === 'squirrel' ? Math.abs(Math.sin(this.t * 12)) * .15 : 0);
       if (this.q) animQuad(this.q, dt, sp, 'walk', t, { leap: true, wag: .6 });
       if (this.ele) animElephant(this.ele, dt, 2, t);
+      if (this.mac) { a.position.y += Math.abs(Math.sin(this.t * 10)) * .3; this.mac.arms.forEach(ar => ar.rotation.x = -2.8); }
       if (this.t > 5) a.visible = false;
     }
   }

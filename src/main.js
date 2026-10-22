@@ -19,6 +19,7 @@ import { LEVELS } from './levels/index.js';
 import { UPG, UPG_DEF, BANK, upg, buy, nextCost, depositPods } from './core/upgrades.js';
 import { resetDroneTokens } from './combat/drone.js';
 import { doSniff, updateSniff, resetStory } from './world/story.js';
+import { updateWeather, resetWeather } from './world/weather.js';
 
 window.__gameLoaded = true;
 let LV = null;          // current level module
@@ -32,7 +33,7 @@ const saveBest = () => { store.set('v2_unlocked', SAVE.unlocked); store.set('v2_
 async function loadLevel(def, forMenu) {
   const mod = (await def.load()).default;
   if (LV && LV.dispose) LV.dispose();
-  ENEMIES.length = 0; resetTokens(); resetDroneTokens(); resetStory(); clearPickups(); clearParts(); clearProjectiles(); waterMats.length = 0;
+  ENEMIES.length = 0; resetTokens(); resetDroneTokens(); resetStory(); resetWeather(); clearPickups(); clearParts(); clearProjectiles(); waterMats.length = 0;
   W.platforms = []; W.ladders = []; W.maxZ = null; W.onClimbTop = null; W.walkable = () => true; P.climb = null; P.plat = null;
   Object.assign(G, { stage: 0, time: 0, hits: 0, kos: 0, freed: 0, pods: 0, podsTotal: 0, downs: 0, hitStop: 0, shake: 0, celebrate: false, busy: false });
   P.maxHp = upg.maxHp(DV.hp); P.hp = P.maxHp; P.stamina = 100; P.ammo = upg.startAmmo(); P.act = null; P.invul = 0; P.kb.set(0, 0, 0); P.vy = 0; P.slowT = 0;
@@ -195,7 +196,7 @@ function frame(now) {
   updatePickups(gdt, T); updParts(gdt); updateSniff(dt);
   if (G.mode === 'play') { if (Math.random() < dt * 3) hud(); else { $('stFill').style.width = P.stamina + '%'; } updateCompass(); }
   // sky follows how far north Pichu has travelled
-  if (LV) { const [a, b, k] = envForZ(LV.envKeys, P.pos.z); focus.copy(P.pos); updateSky(dt, a, b, k, focus); }
+  if (LV) { const [a, b, k] = envForZ(LV.envKeys, P.pos.z); focus.copy(P.pos); updateSky(dt, a, b, k, focus); updateWeather(dt, T); }
   for (const m of waterMats) { if (m.normalMap) { m.normalMap.offset.x += dt * .012; m.normalMap.offset.y += dt * .004; } }
   if (AU.ctx) musicTick();
   updateCamera(dt, T);
