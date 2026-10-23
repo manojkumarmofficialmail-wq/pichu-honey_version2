@@ -34,6 +34,9 @@ export function hud() {
   $('stFill').style.width = P.stamina + '%';
   $('ammo').textContent = P.ammo; $('pods').textContent = G.pods; $('podsT').textContent = G.podsTotal;
   $('freed').textContent = G.freed; $('freedT').textContent = G.level?.cages ?? 0;
+  $('keyBox').style.display = G.keys > 0 ? '' : 'none'; $('keyBox').textContent = '🔑 ' + (G.keys || 0) + (G.mapTotal ? ` · 🗺️ ${G.mapPieces || 0}/${G.mapTotal}` : '');
+  if (G.mapTotal && !(G.keys > 0)) { $('keyBox').style.display = ''; $('keyBox').textContent = `🗺️ ${G.mapPieces || 0}/${G.mapTotal}`; }
+  $('discBox').style.display = G.discTotal ? '' : 'none'; $('discBox').textContent = `📖 ${G.disc || 0}/${G.discTotal || 0}`;
   $('clueBox').style.display = G.clueIcon ? '' : 'none'; $('clueBox').textContent = G.clueIcon ? `${G.clueIcon} ${G.clue ? '✓' : '?'}` : ''; $('clueBox').classList.toggle('got', !!G.clue);
 }
 let lastSec = -1;

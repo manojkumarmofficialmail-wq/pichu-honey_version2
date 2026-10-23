@@ -19,6 +19,8 @@ import { LEVELS } from './levels/index.js';
 import { UPG, UPG_DEF, BANK, upg, buy, nextCost, depositPods } from './core/upgrades.js';
 import { resetDroneTokens } from './combat/drone.js';
 import { doSniff, updateSniff, resetStory } from './world/story.js';
+import { resetDiscovery, tickDiscoveryCard, renderBook, BOOK, setNatureVoice } from './world/discovery.js';
+import { resetTreasure } from './world/treasure.js';
 import { updateWeather, resetWeather } from './world/weather.js';
 
 window.__gameLoaded = true;
@@ -33,7 +35,7 @@ const saveBest = () => { store.set('v2_unlocked', SAVE.unlocked); store.set('v2_
 async function loadLevel(def, forMenu) {
   const mod = (await def.load()).default;
   if (LV && LV.dispose) LV.dispose();
-  ENEMIES.length = 0; resetTokens(); resetDroneTokens(); resetStory(); resetWeather(); clearPickups(); clearParts(); clearProjectiles(); waterMats.length = 0;
+  ENEMIES.length = 0; resetTokens(); resetDroneTokens(); resetStory(); resetDiscovery(); resetTreasure(); resetWeather(); clearPickups(); clearParts(); clearProjectiles(); waterMats.length = 0;
   W.platforms = []; W.ladders = []; W.maxZ = null; W.onClimbTop = null; W.walkable = () => true; P.climb = null; P.plat = null;
   Object.assign(G, { stage: 0, time: 0, hits: 0, kos: 0, freed: 0, pods: 0, podsTotal: 0, downs: 0, hitStop: 0, shake: 0, celebrate: false, busy: false });
   P.maxHp = upg.maxHp(DV.hp); P.hp = P.maxHp; P.stamina = 100; P.ammo = upg.startAmmo(); P.act = null; P.invul = 0; P.kb.set(0, 0, 0); P.vy = 0; P.slowT = 0;
@@ -71,7 +73,7 @@ FLOW.respawn = (cp, cb) => {
 FLOW.complete = () => {
   G.mode = 'end'; joyStop(); const def = LEVELS.find(l => l.id === LV.id);
   const podK = G.podsTotal ? G.pods / G.podsTotal : 1, stars = 1 + (podK >= .5 ? 1 : 0) + (podK >= 1 ? 1 : 0);
-  const B = [['🌿', 'Spice Hunter', 'all cardamom pods', podK >= 1], ['💪', 'Never Down', 'never knocked out', G.downs === 0], ['🛡️', 'Tough Hero', 'took 6 hits or fewer', G.hits <= 6], ['⚡', 'Speedy', 'under ' + fmtTime(DV.fast), G.time < DV.fast]];
+  const B = [['🌿', 'Spice Hunter', 'all cardamom pods', podK >= 1], ['💪', 'Never Down', 'never knocked out', G.downs === 0], ['🛡️', 'Tough Hero', 'took 6 hits or fewer', G.hits <= 6], ['⚡', 'Speedy', 'under ' + fmtTime(DV.fast), G.time < DV.fast], ['📖', 'Nature Explorer', 'found every discovery', G.discTotal > 0 && G.disc >= G.discTotal]];
   const got = B.filter(b => b[3]).length, key = 'L' + LV.id + '_' + SET.diff, old = SAVE.best[key];
   const isRec = !old || G.time < old.time;
   SAVE.best[key] = { time: old ? Math.min(old.time, G.time) : G.time, stars: Math.max(stars, old?.stars || 0), badges: Math.max(got, old?.badges || 0) };
@@ -81,7 +83,7 @@ FLOW.complete = () => {
   const fin = !!LV.final;
   $('endInner').innerHTML = `<h1>${fin ? 'The End 🐾' : 'Level Complete!'}</h1>${fin ? '<p class="soon">🏆 <b>You brought Mittu home and saved the forests of Kerala!</b><br>From Agasthyamala to Wayanad — thank you for playing Pichu &amp; Honey 2.</p>' : ''}<h2>${def.icon} ${def.name} · ${DV.icon} ${DV.name}</h2>
    <div class="stars">${'⭐'.repeat(stars)}${'☆'.repeat(3 - stars)}</div>${isRec && old ? '<div id="newRec">🎉 New best time!</div>' : ''}
-   <div class="stats"><div><b>${fmtTime(G.time)}</b><span>Time</span></div><div><b>${G.kos}</b><span>Poachers beaten</span></div><div><b>${G.freed}</b><span>Animals freed</span></div><div><b>${G.pods}/${G.podsTotal}</b><span>Cardamom</span></div></div>
+   <div class="stats"><div><b>${fmtTime(G.time)}</b><span>Time</span></div><div><b>${G.kos}</b><span>Poachers beaten</span></div><div><b>${G.freed}</b><span>Animals freed</span></div><div><b>${G.pods}/${G.podsTotal}</b><span>Cardamom</span></div>${G.discTotal ? `<div><b>${G.disc}/${G.discTotal}</b><span>Discoveries</span></div>` : ''}${G.treasureTotal ? `<div><b>${G.treasure}/${G.treasureTotal}</b><span>Treasure</span></div>` : ''}</div>
    <div class="badges">${B.map(b => `<span class="badge${b[3] ? ' got' : ''}" title="${b[2]}">${b[0]} ${b[1]}</span>`).join('')}</div>
    ${G.clueIcon ? `<p class="bank">${G.clueIcon} ${G.clue ? (fin ? 'You followed Mittu\'s trail all the way!' : 'Clue found — Mittu\'s trail leads further north!') : 'You missed the clue this time.'}</p>` : ''}
    <p class="bank">🌿 ${gained ? `+${gained} cardamom pods added to your bag! ` : ''}You have <b>${BANK.pods}</b> pods to spend.</p>
@@ -101,6 +103,9 @@ function renderShop() {
   document.querySelectorAll('#shopList .buy').forEach(b => b.onclick = () => { if (buy(b.dataset.u)) { auInit(); sfx.big(); popText('Upgraded! ⭐'); renderShop(); } });
 }
 $('shopClose').onclick = () => $('shop').style.display = 'none'; $('shopBtn').onclick = openShop;
+/* ---------- Kerala Nature Book ---------- */
+function openBook() { const r = renderBook(); $('bookList').innerHTML = r.html; $('bookCount').textContent = `${r.n} / ${r.tot}`; $('book').style.display = 'flex'; }
+$('bookBtn').onclick = openBook; $('bookClose').onclick = () => $('book').style.display = 'none';
 
 /* ---------- menu ---------- */
 function buildMenu() {
@@ -122,12 +127,13 @@ const isFS = () => !!(document.fullscreenElement || document.webkitFullscreenEle
 function goFS(on = !isFS()) { try { if (!on) { if (isFS()) (document.exitFullscreen || document.webkitExitFullscreen).call(document); return; } if (isFS()) return; const p = (DE.requestFullscreen || DE.webkitRequestFullscreen).call(DE, { navigationUI: 'hide' }); if (p && p.then) p.then(() => { try { screen.orientation?.lock?.('landscape').catch(() => { }); } catch (e) { } }).catch(() => { }); } catch (e) { } }
 if (MOBILE && fsOK) $('fsBtn').style.display = ''; $('fsBtn').onclick = () => goFS();
 function syncChips() {
+  $('natChip').textContent = '🌿 Nature voice: ' + (BOOK.voice ? 'On' : 'Off'); $('natChip').classList.toggle('off', !BOOK.voice);
   $('voiceChip').textContent = '🗣 Story voice: ' + (SET.voice ? 'On' : 'Off'); $('voiceChip').classList.toggle('off', !SET.voice);
   $('pVoice').classList.toggle('off', !SET.voice); $('pMute').textContent = AU.muted ? '🔇 Sound' : '🔊 Sound'; $('pMute').classList.toggle('off', AU.muted); $('muteBtn').textContent = AU.muted ? '🔇' : '🔊';
 }
 function toggleMute() { setMuted(!AU.muted); syncChips(); }
 function toggleVoice() { SET.voice = !SET.voice; store.set('voice', SET.voice); if (!SET.voice && 'speechSynthesis' in window) speechSynthesis.cancel(); syncChips(); }
-$('muteBtn').onclick = toggleMute; $('pMute').onclick = toggleMute; $('voiceChip').onclick = toggleVoice; $('pVoice').onclick = toggleVoice;
+$('muteBtn').onclick = toggleMute; $('pMute').onclick = toggleMute; $('voiceChip').onclick = toggleVoice; $('natChip').onclick = () => { setNatureVoice(!BOOK.voice); syncChips(); }; $('pVoice').onclick = toggleVoice;
 const HELP_DESK = '<kbd>W A S D</kbd> walk · <kbd>Shift</kbd> run · <kbd>Space</kbd> jump · drag mouse to look<br><kbd>J</kbd> or <b>click</b> — stick attack (press 3× for a combo)<br><kbd>K</kbd> hold &amp; release — power smash<br><kbd>L</kbd> — dodge roll · <kbd>F</kbd> or <b>right-click</b> — slingshot<br><kbd>H</kbd> — Honey BARK (stuns enemies) · <kbd>Q</kbd> — Honey SNIFF (find Mittu&rsquo;s trail)<br><kbd>E</kbd> — free animals / talk<br><kbd>P</kbd> pause · <kbd>M</kbd> sound · <kbd>Esc</kbd> skip scenes';
 const HELP_MOB = '👈 Left side: walk (push far to run) · 👉 right side: look · 🤏 pinch: zoom<br>⚔️ Attack (tap 3× for a combo) · 💥 hold for a power smash<br>🌀 Dodge roll · 🎯 Slingshot · ⤒ Jump<br>🐶 Honey BARK stuns enemies · 👃 SNIFF finds Mittu&rsquo;s trail · ✋ free animals';
 $('helpTxt').innerHTML = MOBILE ? HELP_MOB : HELP_DESK; $('keysTxt').innerHTML = MOBILE ? '👈 walk · 👉 look · buttons to fight' : HELP_DESK.split('<br>').slice(0, 3).join('<br>');
@@ -194,7 +200,7 @@ function frame(now) {
   if (G.mode === 'play' || G.mode === 'cine') updateEnemies(gdt, T);
   animPichu(gdt, T); updateHoney(gdt, T);
   if (LV) LV.update(gdt, T);
-  updatePickups(gdt, T); updParts(gdt); updateSniff(dt);
+  updatePickups(gdt, T); updParts(gdt); updateSniff(dt); tickDiscoveryCard(dt);
   if (G.mode === 'play') { if (Math.random() < dt * 3) hud(); else { $('stFill').style.width = P.stamina + '%'; } updateCompass(); }
   // sky follows how far north Pichu has travelled
   if (LV) { const [a, b, k] = envForZ(LV.envKeys, P.pos.z); focus.copy(P.pos); updateSky(dt, a, b, k, focus); updateWeather(dt, T); }

@@ -24,7 +24,12 @@ import { WildBoar } from '../combat/beasts.js';
 import { ShadowLeopard, purr } from '../combat/bosses3.js';
 import { ENEMIES } from '../combat/combat.js';
 import { Clue, puppyWhine } from '../world/story.js';
-import { newRuntime, tickCommon, tryFreeCage, setCP, respawnReset, alive } from './kit.js';
+import { newRuntime, tickCommon, tryFreeCage, tryInteract, setCP, respawnReset, alive } from './kit.js';
+import { Searchlight, StealthZone, Guide, hideBush } from '../world/challenges.js';
+import { KeyItem, KeyGate, Chest } from '../world/treasure.js';
+import { Discovery } from '../world/discovery.js';
+import { kingCobra, thrush } from '../world/wildlife.js';
+import { makeMacaque } from '../world/props2.js';
 
 /* ---------- layout ---------- */
 const pathX = z => Math.sin(z * .019 + 2) * 10 + Math.sin(z * .052 + .5) * 3.5;
@@ -65,7 +70,8 @@ const level = {
   id: 4, name: 'Silent Valley', ml: 'സൈലന്റ് വാലി', region: 'Silent Valley · Palakkad', music: 'forest', cages: 3,
   envKeys: [[999, 'monsoon'], [62, 'monsoon'], [40, 'rainNight'], [-60, 'rainNight'], [-72, 'night']],
   objectiveTarget() { return L?.target?.() ?? null; },
-  sniffTarget() { if (!L) return null; if (!L.clue.found) return { x: L.clue.x, z: L.clue.z, clue: true }; return this.objectiveTarget(); },
+  dbg() { return L; },
+  sniffTarget() { if (!L) return null; if (!L.clue.found) return { x: L.clue.x, z: L.clue.z, clue: true }; if (!L.key.got && G.stage === 1 && L.stealthDone) return L.guide.done ? L.key : { x: L.guide.x, z: L.guide.z }; return this.objectiveTarget(); },
 
   build(root) {
     resetCollision(); seed(7474);
@@ -117,7 +123,28 @@ const level = {
     new Deck(root, BR.x, BR.z, 2.4, 16, 0);
     const rope = std(0xb8a070, { roughness: 1 });
     for (const s of [-1, 1]) { for (let i = 0; i <= 6; i++) M(CY(.06, .06, 1.4, 5), std(0x5a3a22), BR.x + s * 1.25, W.water + 1.1, BR.z - 8 + i * 16 / 6, root); const r = M(CY(.025, .025, 16, 4), rope, BR.x + s * 1.25, W.water + 1.6, BR.z, root); r.rotation.x = PI / 2; }
-    L.gates.g = new Barricade(root, pathX(GZ), GZ, 9, 'logs');
+    L.gates.g = new KeyGate(root, pathX(GZ), GZ, 8);
+    const gateReady = () => G.freed >= 3 && L.clue.found && !alive(3) && !alive(4);
+    L.inter.push({ canUse: () => L.gates.g.canUse(), label: () => L.gates.g.label(), use: () => { if (!gateReady()) { dialog('Pichu', 'First let\'s free all the macaques and find Mittu\'s clue.', 3); return true; } const ok = L.gates.g.use(); this.checkGate(); return ok; } });
+    // night stealth: three poacher searchlights sweep across the path near the dark camp
+    const SL = [[-1, 7.5, -PI / 2], [-8, -7.5, PI / 2], [-15, 7.5, -PI / 2]].map(([z, dx, a]) => new Searchlight(root, pathX(z) + dx, z, a, .62, 10.5, .26, .42 + Math.abs(z) * .008));
+    const bushes = [2.5, -4, -10.5, -17].map(z => hideBush(root, pathX(z), z)); L.ticks.push(...bushes);
+    L.stealth = new StealthZone(SL, new THREE.Vector3(pathX(10), height(pathX(10), 10), 10), () => G.stage === 1 && P.pos.z < 7 && P.pos.z > -19 && !L.stealthDone, bushes);
+    L.ticks.push({ tick: (dt, t) => L.stealth.update(dt, t) });
+    // a lion-tailed macaque grabbed the poachers' gate key — follow it
+    const mq = makeMacaque(1.1); root.add(mq.root);
+    const mpts = [{ x: pathX(-19) + 2, z: -19 }, { x: pathX(-20) - 5, z: -20.5 }, { x: pathX(-18) - 11, z: -18 }, { x: pathX(-14) - 15, z: -14.5 }, { x: pathX(-21) - 16, z: -21 }];
+    L.guide = new Guide({ root: mq.root, anim: (dt, sp, t) => { mq.root.rotation.z = sp > .2 ? Math.sin(t * 14) * .1 : 0; } }, mpts, { speed: 3, wait: 7, glow: 0xb0ffb0, sound: (pan, vol) => sfx.chirp(pan), onDone: () => { L.key.reveal(); dialog('Pichu', 'The macaque dropped the key! Thank you, little friend!', 3); } });
+    L.ticks.push(L.guide);
+    L.key = new KeyItem(root, mpts[mpts.length - 1].x + 1, -21.5, { hidden: true, name: 'Camp gate key', onGet: () => { dialog('Pichu', 'Now we can open the gate past the camp!', 2.5); this.objective(); } }); L.ticks.push(L.key);
+    // treasure
+    [[pathX(96) + 12, 96], [pathX(26) - 13, 26], [pathX(-50) + 10, -50]].forEach(([x, z]) => { const c = new Chest(root, x, z); L.inter.push(c); L.ticks.push(c); });
+    // Nature Book
+    L.ticks.push(new Discovery(root, 'silent', START.x, START.z - 9, { r: 5, y: H_START }));
+    { const cx = pathX(82) + 5, cz = 82; L.ticks.push(kingCobra(root, cx, cz, -PI / 2), new Discovery(root, 'cobra', cx, cz, { r: 7, y: height(cx, cz) })); }
+    L.ticks.push(new Discovery(root, 'kunthi', BR.x, BR.z + 3, { r: 6, y: W.water + 1 }));
+    { const tx = BR.x - 6, tz = BR.z - 10; L.ticks.push(thrush(root, tx, height(tx, tz) + .9, tz), new Discovery(root, 'thrush', tx, tz, { r: 8, y: height(tx, tz) })); }
+    L.ticks.push(new Discovery(root, 'ltmacaque', pathX(16), 16, { r: 9, y: height(pathX(16), 16) + 4 }));
     // moonlight breaking through the clouds over the leopard's den (so the black leopard can be seen)
     const moon = new THREE.SpotLight(0xc8d4ff, 60, 70, .62, .6, 1); moon.position.set(AR.x + 4, H_AR + 34, AR.z + 8); moon.target.position.set(AR.x, H_AR, AR.z); root.add(moon, moon.target);
     const fill = new THREE.PointLight(0x9ab0ff, 6, 26, 1.2); fill.position.set(AR.x, H_AR + 5, AR.z + 4); root.add(fill);
@@ -143,12 +170,11 @@ const level = {
     [[-4, 76], [4, 72]].forEach(([dx, z]) => new WildBoar(pathX(z) + dx, z, root, { group: 2 }));
     [[-2, 33, 'grunt'], [5, 26, 'slinger']].forEach(([dx, z, t]) => new Enemy(t, pathX(z) + dx, z, root, { group: 3 })); new Drone(pathX(30) + 9, 30, root, { group: 3 });
     [[-4, 13], [4, 7]].forEach(([dx, z]) => new WildBoar(pathX(z) + dx, z, root, { group: 4 })); new Enemy('grunt', pathX(10) - 3, 10, root, { group: 4 });
-    [[2, -7, 'brute'], [-6, -13, 'slinger']].forEach(([dx, z, t]) => new Enemy(t, pathX(z) + dx, z, root, { group: 5 }));
     [[-4, -44], [5, -52]].forEach(([dx, z]) => new WildBoar(pathX(z) + dx, z, root, { group: 6 }));
     L.boss = new ShadowLeopard(root, AR.x, AR.z - 6, { arena: AR, trees: ARTREES, yaw: 0 });
     L.target = () => {
       if (G.stage === 0) return alive(1) ? { x: pathX(98), z: 98 } : { x: pathX(74), z: 74 };
-      if (G.stage === 1) { for (const [g, c] of [[3, 0], [4, 1], [5, 2]]) { if (alive(g) || !L.cages[c].free) return alive(g) ? L.cages[c] : L.cages[c]; } if (!L.clue.found) return L.clue; return { x: pathX(GZ), z: GZ }; }
+      if (G.stage === 1) { for (const [g, c] of [[3, 0], [4, 1], [5, 2]]) { if (alive(g) || !L.cages[c].free) return L.cages[c]; } if (!L.clue.found) return L.clue; if (!L.key.got && !(G.keys > 0)) return L.guide.done ? L.key : { x: L.guide.x, z: L.guide.z }; return { x: pathX(GZ), z: GZ }; }
       if (G.stage === 2) return AR;
       return null;
     };
@@ -170,7 +196,7 @@ const level = {
     const s = G.stage;
     setObjective(
       s === 0 ? (alive(1) ? `Stop the poachers at the entrance (${3 - alive(1)}/3)` : alive(2) ? 'Calm the angry boars — break their glowing collars 💚' : 'Cross the rope bridge over the river') :
-      s === 1 ? (G.freed < 3 || alive(3) || alive(4) || alive(5) ? `Free the lion-tailed macaques in the dark forest (${G.freed}/3)` : !L.clue.found ? 'Search for a clue about Mittu (Q / 👃 SNIFF)' : 'Follow the fireflies north') :
+      s === 1 ? (P.pos.z < 7 && P.pos.z > -19 && !L.stealthDone ? `Sneak past the searchlights: hide in the bushes 🌿 and dash when the light swings away (macaques ${G.freed}/3)` : G.freed < 3 || alive(3) || alive(4) ? `Free the lion-tailed macaques in the dark forest (${G.freed}/3)` : !L.clue.found ? 'Search for a clue about Mittu (Q / 👃 SNIFF)' : !L.key.got && !(G.keys > 0) ? 'A macaque ran off with the gate key! Follow it 🐒' : L.gates.g.open ? 'Follow the fireflies north' : 'Unlock the gate with the key 🔑') :
       s === 2 ? 'Follow the fireflies to the leopard\'s den 🌙' : 'Calm the Shadow Leopard — break its collar!');
   },
 
@@ -182,12 +208,12 @@ const level = {
     }, 400);
   },
   checkGate() {
-    if (G.stage === 1 && G.freed >= 3 && L.clue.found && !alive(3) && !alive(4) && !alive(5) && !L.gates.g.open) {
-      L.gates.g.openUp(); G.stage = 2; setCP(L, pathX(GZ - 2), GZ - 2); sfx.big(); popText('Macaques saved! 🐒');
+    if (G.stage === 1 && L.gates.g.open) {
+      G.stage = 2; setCP(L, pathX(GZ - 2), GZ - 2); sfx.big(); popText('Macaques saved! 🐒');
       dialog('Pichu', 'The fireflies are showing us the way… something big is growling up ahead.', 4); this.objective();
     }
   },
-  action() { tryFreeCage(L, c => alive(c.guard) > 0); this.checkGate(); this.objective(); },
+  action() { if (tryInteract(L)) { this.objective(); return; } tryFreeCage(L, c => alive(c.guard) > 0); this.checkGate(); this.objective(); },
 
   startBoss() {
     L.walled = true; P.pos.set(AR.x, W.height(AR.x, AR.z + 5), AR.z + 5); P.yaw = PI; CAM.yaw = 0; G.stage = 3; setCP(L, AR.x, AR.z + 11); this.objective();
@@ -217,7 +243,9 @@ const level = {
     if (!tickCommon(L, dt, t, 'forest')) return;
     if (P.pos.z < 108) wakeGroup(1);
     if (P.pos.z < 86) { wakeGroup(2); if (!L.boarTip) { L.boarTip = true; dialog('Ranger Ammini (radio)', MOBILE ? 'Careful! When a boar scrapes its feet and a red line appears, tap 🌀 to roll aside — then hit it while it\'s dizzy!' : 'Careful! When a boar scrapes its feet and a red line appears, press L to roll aside — then hit it while it\'s dizzy!', 6); } }
-    if (P.pos.z < 40) wakeGroup(3); if (P.pos.z < 20) wakeGroup(4); if (P.pos.z < 2) wakeGroup(5); if (P.pos.z < -34) wakeGroup(6);
+    if (P.pos.z < 40) wakeGroup(3); if (P.pos.z < 20) wakeGroup(4); if (P.pos.z < 8 && !L.stealthMsg && G.stage === 1) { L.stealthMsg = true; dialog('Pichu', 'Searchlights! I\'ll hide in the bushes 🌿 and dash to the next one when the light swings away…', 4.5); }
+    if (!L.stealthDone && P.pos.z < -19 && G.stage === 1) { L.stealthDone = true; sfx.collect(); popText('Sneaked past! 🤫'); L.stealth.lights.forEach(l => l.on = false); L.guide.active = true; setCP(L, pathX(-19), -19); dialog('Pichu', 'Made it! Hey — that macaque has something shiny… the poachers\' gate key! Follow it!', 4); }
+    if (P.pos.z < -34) wakeGroup(6);
     if (!L.nightMsg && P.pos.z < 40) { L.nightMsg = true; dialog('Pichu', 'It\'s getting dark… good thing I have my lantern! 🏮', 3); }
     if (!L.walled && G.stage === 2 && P.pos.z < WALLZ - 1.5) this.startBoss();
     if (L.bossOn) { const dx = P.pos.x - AR.x, dz = P.pos.z - AR.z, d = Math.hypot(dx, dz); if (d > AR.r - .5) { P.pos.x = AR.x + dx / d * (AR.r - .5); P.pos.z = AR.z + dz / d * (AR.r - .5); } }

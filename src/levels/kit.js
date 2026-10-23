@@ -11,7 +11,7 @@ import { resetDroneTokens } from '../combat/drone.js';
 
 export function newRuntime(root, extra = {}) {
   W.platforms = []; W.ladders = []; W.onClimbTop = null; W.maxZ = null; resetDroneTokens();
-  return Object.assign({ root, ticks: [], cages: [], gates: {}, cp: new THREE.Vector3(), msgT: 0, bossOn: false, boss: null, walled: false }, extra);
+  return Object.assign({ root, ticks: [], cages: [], gates: {}, inter: [], cp: new THREE.Vector3(), msgT: 0, bossOn: false, boss: null, walled: false }, extra);
 }
 export const near = (a, r) => Math.hypot(P.pos.x - a.x, P.pos.z - a.z) < r;
 export function nearCage(L) { for (const c of L.cages) if (!c.free && near(c, 2.8)) return c; return null; }
@@ -33,9 +33,12 @@ export function tickCommon(L, dt, t, calmMood) {
   for (const k in L.gates) L.gates[k].update(dt);
   if (G.mode !== 'play' || G.busy) return false;
   if (!L.bossOn) { let fighting = false; for (const e of ENEMIES) if (e.alive && e.awake && !e.prop && Math.hypot(e.x - P.pos.x, e.z - P.pos.z) < 16) { fighting = true; break; } MUS.mood = fighting ? 'battle' : calmMood; }
-  const c = nearCage(L); setPrompt(c ? (MOBILE ? 'Tap ✋ to free the animal' : 'Press E to free the animal') : '');
+  const c = nearCage(L); const it = (L.inter || []).find(o => o.canUse());
+  setPrompt(c ? (MOBILE ? 'Tap ✋ to free the animal' : 'Press E to free the animal') : it ? it.label() : '', !!c || (it && !/Locked/.test(it.label())));
   return true;
 }
+// E / ✋ on gates, chests, torches… returns true if something was used
+export function tryInteract(L) { const it = (L.inter || []).find(o => o.canUse()); return it ? it.use() : false; }
 export function ambientBirds(dt, kinds = ['chirp', 'koel']) {
   if (!AU.ctx) return; AU.ambT -= dt;
   if (AU.ambT < 0) { AU.ambT = rand(.6, 2.4); sfx[pick(kinds)](rand(-.9, .9)); }

@@ -97,6 +97,20 @@ kbd{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);borde
 @keyframes pulse{50%{box-shadow:0 0 14px rgba(255,209,102,.6)}}
 #newRec{color:#7dffa0;font-weight:700;font-size:18px}
 .soon{background:rgba(120,220,140,.15);border:1px dashed rgba(120,220,140,.6);border-radius:14px;padding:10px}
+#book{position:fixed;inset:0;z-index:13;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.5);padding:18px}
+.card.wide{max-width:760px}
+.bookLv{font-size:13px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);margin:12px 0 6px;text-align:left}
+.bookGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;text-align:left}
+.bookItem{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);border-radius:12px;padding:8px 10px;font-size:13px;line-height:1.35}
+.bookItem .bi{font-size:24px;float:left;margin-right:8px}.bookItem b{display:block}.bookItem .ml{display:block;font-size:11px;color:#c8ffb0}.bookItem small{display:block;opacity:.85;margin-top:3px}
+.bookItem.locked{opacity:.45}
+#discover{position:fixed;right:calc(12px + var(--sr));top:calc(70px + var(--st));z-index:6;width:min(330px,60vw);padding:10px 12px;display:flex;gap:10px;align-items:flex-start;pointer-events:none;opacity:0;transform:translateX(30px);transition:opacity .5s,transform .5s}
+#discover.show{opacity:1;transform:none}
+#discover .dIcon{font-size:34px;line-height:1}#discover .dHead{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:#9ae86a}
+#discover .dName{font-weight:700;font-size:15px}#discover .dName .ml{font-weight:400;font-size:12px;color:#c8ffb0;margin-left:4px}#discover .dFact{font-size:12.5px;line-height:1.35;opacity:.92;margin-top:2px}
+#keyBox,#discBox{padding:0 8px;border-radius:10px;background:rgba(255,220,120,.18);border:1px solid rgba(255,220,120,.4)}#discBox{background:rgba(150,230,110,.15);border-color:rgba(150,230,110,.4)}
+body.touch #discover{top:auto;bottom:calc(270px + var(--sb));right:auto;left:calc(12px + var(--sl));width:min(300px,70vw)}
+@media (pointer:coarse) and (orientation:landscape){body.touch #discover{bottom:auto;top:calc(120px + var(--st));left:calc(12px + var(--sl));width:min(280px,36vw)}}
 #shop{position:fixed;inset:0;z-index:13;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.5);padding:18px}
 .upg{display:flex;align-items:center;gap:10px;text-align:left;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);border-radius:14px;padding:8px 12px;margin:6px 0}
 .upg .ic{font-size:26px}.upg .nm{flex:1;font-weight:600}.upg .nm small{display:block;font-weight:400;font-size:12px;opacity:.8}
@@ -149,7 +163,7 @@ body.touch #prompt{bottom:calc(266px + var(--sb))}
 <div id="hud" class="glass">
   <div class="hpRow"><span>❤️</span><div class="bar"><i id="hpFill"></i></div></div>
   <div class="bar" id="stBar"><i id="stFill"></i></div>
-  <div class="row"><span title="Slingshot pebbles">🪨 <b id="ammo">0</b></span><span title="Cardamom pods">🌿 <b id="pods">0</b>/<b id="podsT">0</b></span><span title="Animals freed">🦌 <b id="freed">0</b>/<b id="freedT">0</b></span><span id="clueBox" title="Clue to find Mittu" style="display:none"></span><span class="tm">⏱ <span id="timer">0:00</span></span></div>
+  <div class="row"><span title="Slingshot pebbles">🪨 <b id="ammo">0</b></span><span title="Cardamom pods">🌿 <b id="pods">0</b>/<b id="podsT">0</b></span><span title="Animals freed">🦌 <b id="freed">0</b>/<b id="freedT">0</b></span><span id="keyBox" title="Keys" style="display:none"></span><span id="discBox" title="Nature discoveries" style="display:none"></span><span id="clueBox" title="Clue to find Mittu" style="display:none"></span><span class="tm">⏱ <span id="timer">0:00</span></span></div>
   <div id="stageLbl">Level 1 · Agasthya Hills</div>
   <div id="objective">…</div>
 </div>
@@ -185,7 +199,7 @@ body.touch #prompt{bottom:calc(266px + var(--sb))}
       <div class="secLbl">Map: south → north</div>
       <div id="levelMap"></div>
       <div class="mapNote">New forests unlock in each update.</div>
-      <div class="opts"><button class="chip" id="shopBtn">🛒 Upgrade shop</button><button class="chip" id="voiceChip">🗣 Story voice: On</button><button class="chip" id="classicBtn">🌙 Play the original game</button></div>
+      <div class="opts"><button class="chip" id="shopBtn">🛒 Upgrade shop</button><button class="chip" id="bookBtn">📖 Nature Book</button><button class="chip" id="natChip">🌿 Nature voice: On</button><button class="chip" id="voiceChip">🗣 Story voice: On</button><button class="chip" id="classicBtn">🌙 Play the original game</button></div>
       <div class="keys" id="keysTxt"></div>
     </div>
     <div id="loading">Loading…</div>
@@ -193,6 +207,8 @@ body.touch #prompt{bottom:calc(266px + var(--sb))}
 </div>
 <div id="loadScreen"><div class="ml" id="loadMl"></div><div id="loadName"></div><div id="loadPlace"></div><div class="spin"></div></div>
 <div id="endcard"><div class="card glass" id="endInner"></div></div>
+<div id="book"><div class="card glass wide"><h1 style="font-size:38px">Kerala Nature Book</h1><h2>📖 Discoveries <b id="bookCount">0</b></h2><div id="bookList"></div><button class="btn" id="bookClose">Close</button></div></div>
+<div id="discover" class="glass"></div>
 <div id="shop"><div class="card glass"><h1 style="font-size:40px">Upgrade Shop</h1><h2>Spend your cardamom pods 🌿 <b id="shopBank">0</b></h2><div id="shopList"></div><p class="mapNote">Only new pods count: beat your best pod score in a level to earn more.</p><button class="btn" id="shopClose">Done</button></div></div>
 <div id="help"><div class="card glass"><h2>How to play</h2><p class="keys" id="helpTxt"></p><button class="btn" id="helpClose">Got it!</button></div></div>
 <div id="pause"><div class="card glass"><h1 style="font-size:44px">Paused</h1><h2 id="pauseInfo">Take a break 🐾</h2>

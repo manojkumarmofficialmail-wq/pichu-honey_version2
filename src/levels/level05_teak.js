@@ -1,5 +1,5 @@
 // LEVEL 5 — TEAK RIVER (Nilambur, Malappuram)
-// South → north: Conolly's Plot (the world's oldest teak plantation, with the giant Kannimari teak) →
+// South → north: Conolly's Plot (one of the world's oldest teak plantations, with its giant teak) →
 // the Chaliyar river, where the poachers cut the hanging bridge: hop across floating teak logs →
 // logging camp (animals + Mittu's food bowl) → Kaala's sawmill → the Sawmill Boss → Kaala himself!
 import { THREE, std, M, jitter, hsl, TEX, signTex } from '../core/engine.js';
@@ -24,23 +24,29 @@ import { Drone } from '../combat/drone.js';
 import { SawmillBoss } from '../combat/bosses4.js';
 import { ENEMIES } from '../combat/combat.js';
 import { Clue, puppyWhine } from '../world/story.js';
-import { newRuntime, tickCommon, tryFreeCage, setCP, respawnReset, ambientBirds, alive } from './kit.js';
+import { newRuntime, tickCommon, tryFreeCage, tryInteract, setCP, respawnReset, ambientBirds, alive } from './kit.js';
+import { Stone, Crumble } from '../world/challenges.js';
+import { KeyItem, KeyGate, Chest } from '../world/treasure.js';
+import { Discovery } from '../world/discovery.js';
 
 /* ---------- layout ---------- */
 const pathX = z => Math.sin(z * .02 + 1.5) * 10 + Math.sin(z * .055) * 3;
 const riverZ = x => 58 + Math.sin(x * .04) * 2;
 const START = { x: pathX(118), z: 118 };
-const GIANT = { x: START.x - 9, z: 106 };             // the Kannimari teak
+const GIANT = { x: START.x - 9, z: 106 };             // the giant teak of Conolly's Plot
 const XR = pathX(58), RZ = riverZ(XR);                 // where Pichu crosses the river
 const CAMP = { x: pathX(16), z: 16 };
 const AR = { x: pathX(-86), z: -86, r: 16 };
 const MACH = { x: AR.x, z: AR.z - 11.5 };
 const GZ = -22, WALLZ = AR.z + 18;
+const RVZ = -40;                                       // a rocky gorge on the way to the sawmill (rotten walkway)
+const MUSEUM = { x: START.x + 9, z: 112 };
 
 function baseH(x, z) {
   let h = fbm(x * .02 + 6.6, z * .02 + 3.3) * 3.2 + vnoise(x * .1, z * .1) * .3;
   h += 3 * smooth(40, -30, z);
   const rd = Math.abs(z - riverZ(x)); h = lerp(h, .4, smooth(15, 8.5, rd) * .85); h = lerp(h, -2.9, smooth(7.6, 6.7, rd));
+  h = lerp(h, -3.2, smooth(4.4, 3.7, Math.abs(z - RVZ)));
   const ex = Math.max(0, Math.abs(x - pathX(z) * .4) - 43); h += ex * ex * .08;
   const es = Math.max(0, z - 124); h += es * es * .1;
   return h;
@@ -74,7 +80,7 @@ const level = {
   build(root) {
     resetCollision(); seed(8585);
     W.height = height; W.water = -.6; W.bounds = { x0: -54, x1: 54, z0: AR.z - 14, z1: 127 };
-    W.walkable = (x, z) => !(Math.abs(z - riverZ(x)) < 7.6 && height(x, z) < W.water - .35);
+    W.walkable = (x, z) => !((Math.abs(z - riverZ(x)) < 7.6 || Math.abs(z - RVZ) < 4.5) && height(x, z) < W.water - .35);
     WX.rain = 0; WX.night = 0;
     L = newRuntime(root, { stage: 0 }); setCP(L, START.x, START.z - 2);
     W.minZ = () => G.stage < 1 && alive(1) ? RZ + 13 : !L.gates.g.open ? GZ + .7 : -1e9;
@@ -91,7 +97,7 @@ const level = {
 
   plants(root) {
     const F = new Flora();
-    const clear = (x, z) => Math.hypot(x - START.x, z - START.z) < 9 || Math.hypot(x - CAMP.x, z - CAMP.z) < 14 || Math.hypot(x - AR.x, z - AR.z) < 20 || Math.abs(z - riverZ(x)) < 9.5 || Math.hypot(x - GIANT.x, z - GIANT.z) < 5;
+    const clear = (x, z) => Math.hypot(x - START.x, z - START.z) < 9 || Math.hypot(x - CAMP.x, z - CAMP.z) < 14 || Math.hypot(x - AR.x, z - AR.z) < 20 || Math.abs(z - riverZ(x)) < 9.5 || Math.hypot(x - GIANT.x, z - GIANT.z) < 5 || Math.abs(z - RVZ) < 6 || Math.hypot(x - MUSEUM.x, z - MUSEUM.z) < 6 || Math.hypot(x - CAMP.x - 13, z - CAMP.z - 4) < 4;
     // Conolly's Plot: teak planted in neat rows
     for (let z = 124; z > 70; z -= 5.2) for (let x = -50; x < 50; x += 5.2) {
       const tx = x + sr(-.6, .6), tz = z + sr(-.6, .6); if (Math.abs(tx - pathX(tz)) < 4.5 || clear(tx, tz)) continue;
@@ -118,7 +124,7 @@ const level = {
 
   props(root) {
     makeSign(root, START.x - 3.5, START.z + 2, 0, 'നിലമ്പൂർ', "Conolly's Plot · Nilambur", '#2f5a2a');
-    makeSign(root, GIANT.x + 3.5, GIANT.z + 2.5, -.4, 'KANNIMARI', 'The giant teak · 400+ years', '#5a3a1a');
+    makeSign(root, GIANT.x + 3.5, GIANT.z + 2.5, -.4, 'GIANT TEAK', "Conolly's Plot", '#5a3a1a');
     makeSign(root, XR + 3, RZ + 10.5, 0, '⚠ BRIDGE CUT', 'by poachers!', '#8a2a1a');
     brokenBridge(root, XR + 7, RZ - 8.5, RZ + 8.5);
     // floating teak logs: 5 lanes across the river, all drifting east with the current
@@ -138,7 +144,29 @@ const level = {
     L.cages.push(Object.assign(new Cage(root, CAMP.x + 4, CAMP.z - 9, 'macaque', 0), { guard: 3 }));
     L.clue = new Clue(root, CAMP.x - 2, CAMP.z - 11, 'bowl', () => { puppyWhine(.15); dialog('Pichu', "Mittu's little food bowl — and it still has rice in it! Kaala must be taking her to the sawmill right now!", 5); HN.bark = 1; this.checkGate(); this.objective(); });
     L.ticks.push(L.clue);
-    L.gates.g = new Barricade(root, pathX(GZ), GZ, 9, 'logs');
+    L.gates.g = new KeyGate(root, pathX(GZ), GZ, 8);
+    const campDone = () => L.wave4 && !alive(2) && !alive(3) && !alive(4) && G.freed >= 3 && L.clue.found;
+    L.inter.push({ canUse: () => L.gates.g.canUse(), label: () => L.gates.g.label(), use: () => { if (!campDone()) { dialog('Pichu', 'First let\'s clear the camp, free the animals and find Mittu\'s clue.', 3); return true; } const ok = L.gates.g.use(); this.checkGate(); return ok; } });
+    // climb the cut teak stumps by the camp: the gate key is on the tallest one
+    const st = [[11, 2, 1.0], [13.6, 4.2, 1.9], [11.8, 6.6, 2.8], [14.2, 8.4, 3.6]];
+    st.forEach(([dx, dz, h]) => new Stone(root, CAMP.x + dx, CAMP.z + dz, .75, height(CAMP.x + dx, CAMP.z + dz) + h, 'stump'));
+    { const [dx, dz, h] = st[st.length - 1]; L.key = new KeyItem(root, CAMP.x + dx, CAMP.z + dz, { y: height(CAMP.x + dx, CAMP.z + dz) + h, name: 'Sawmill gate key', onGet: () => { dialog('Pichu', 'The sawmill gate key! Now nothing can stop us.', 3); this.objective(); } }); L.ticks.push(L.key); }
+    // the rotten walkway over the gorge: planks crumble a moment after you step on them — RUN!
+    buildWater(root, { x: 0, z: RVZ, w: 116, l: 9, y: W.water, repeat: [24, 2] });
+    { const px = pathX(RVZ), topY = height(px, RVZ + 4.8) + .02; L.planks = []; for (let i = 0; i < 9; i++) { const z = RVZ + 4.2 - i * 1.05; L.planks.push(new Crumble(root, px, z, 2.2, 1.12, topY)); }
+      for (const s of [-1, 1]) for (const z of [RVZ + 4.6, RVZ - 4.6]) M(new THREE.CylinderGeometry(.1, .12, 1.6, 6), std(0x5a3a22), px + s * 1.15, topY + .5, z, root);
+      L.ticks.push({ tick: dt => { for (const p of L.planks) p.update(dt); } }); }
+    makeSign(root, pathX(RVZ + 7) + 3.5, RVZ + 7, 0, '⚠ ROTTEN', 'walkway — run!', '#8a2a1a');
+    // treasure
+    [[pathX(110) + 14, 110], [CAMP.x - 14, CAMP.z + 9], [pathX(-56) - 10, -56]].forEach(([x, z]) => { const c = new Chest(root, x, z); L.inter.push(c); L.ticks.push(c); });
+    // the teak museum + Nature Book
+    { const g = new THREE.Group(); g.position.set(MUSEUM.x, height(MUSEUM.x, MUSEUM.z), MUSEUM.z); g.rotation.y = -PI / 2; root.add(g); M(new THREE.BoxGeometry(6, 3, 4), std(0xe8dcc0), 0, 1.5, 0, g); const rf = M(new THREE.ConeGeometry(4.4, 1.6, 4), std(0x8a4a2a, { flatShading: true }), 0, 3.8, 0, g); rf.rotation.y = PI / 4; rf.scale.set(1, 1, .75); for (const s of [-1, 1]) M(new THREE.CylinderGeometry(.16, .16, 3, 8), std(0x7a5030), s * 1.6, 1.5, 2.1, g); addOb(MUSEUM.x, MUSEUM.z, 3.2); makeSign(root, MUSEUM.x - 3.8, MUSEUM.z + 2.5, 0, 'TEAK MUSEUM', 'Nilambur', '#5a3a1a'); }
+    L.ticks.push(new Discovery(root, 'teakmuseum', MUSEUM.x - 3, MUSEUM.z, { r: 6, y: height(MUSEUM.x, MUSEUM.z) + 2 }));
+    L.ticks.push(new Discovery(root, 'conolly', pathX(114), 114, { r: 5, y: H_START }));
+    L.ticks.push(new Discovery(root, 'bigteak', GIANT.x, GIANT.z, { r: 8, y: height(GIANT.x, GIANT.z) + 6 }));
+    L.ticks.push(new Discovery(root, 'teak', pathX(86) + 4, 86, { r: 5, y: height(pathX(86) + 4, 86) + 2 }));
+    L.ticks.push(new Discovery(root, 'chaliyar', XR - 2, RZ + 9.5, { r: 6, y: height(XR - 2, RZ + 9.5) }));
+    L.ticks.push(new Discovery(root, 'hangbridge', XR + 7, RZ + 10, { r: 6, y: height(XR + 7, RZ + 10) + 2 }));
     makeSign(root, pathX(-58) + 4, -58, 0, 'SAWMILL', 'KEEP OUT!', '#8a2a1a');
     // the sawmill yard
     L.ticks.push(sawmillShed(root, AR.x + 4, AR.z - 25, 12, 7, 0)); addOb(MACH.x, MACH.z, 2.8);
@@ -154,11 +182,10 @@ const level = {
     [[-3, 96, 'grunt'], [3, 93, 'grunt'], [0, 88, 'slinger']].forEach(([dx, z, t]) => new Enemy(t, pathX(z) + dx, z, root, { group: 1 }));
     [[0, 42, 'brute'], [-5, 38, 'grunt'], [5, 36, 'grunt']].forEach(([dx, z, t]) => new Enemy(t, pathX(z) + dx, z, root, { group: 2 }));
     [[-4, 4, 'grunt'], [4, 2, 'grunt'], [-10, -4, 'slinger'], [10, -6, 'slinger']].forEach(([dx, dz, t]) => new Enemy(t, CAMP.x + dx, CAMP.z + dz, root, { group: 3 })); new Drone(CAMP.x, CAMP.z - 6, root, { group: 3 });
-    [[-6, -40], [6, -46]].forEach(([dx, z]) => new Drone(pathX(z) + dx, z, root, { group: 5 })); new Enemy('slinger', pathX(-50) + 4, -50, root, { group: 5 });
     L.boss = new SawmillBoss(root, AR, MACH, { yaw: 0 });
     L.target = () => {
       if (G.stage === 0) return alive(1) ? { x: pathX(93), z: 93 } : { x: XR, z: RZ + 8 };
-      if (G.stage === 1) { if (alive(2) || !L.cages[0].free) return L.cages[0]; if (alive(3) || alive(4)) return CAMP; const c = L.cages.find(c => !c.free); if (c) return c; if (!L.clue.found) return L.clue; return { x: pathX(GZ), z: GZ }; }
+      if (G.stage === 1) { if (alive(2) || !L.cages[0].free) return L.cages[0]; if (alive(3) || alive(4)) return CAMP; const c = L.cages.find(c => !c.free); if (c) return c; if (!L.clue.found) return L.clue; if (!L.key.got && !(G.keys > 0)) return L.key; return { x: pathX(GZ), z: GZ }; }
       if (G.stage === 2) return AR;
       return null;
     };
@@ -170,7 +197,7 @@ const level = {
     const go = () => { FLOW.startPlay(); showTitle('Level 5', 'Teak River', 'Cross the Chaliyar and stop Kaala\'s sawmill', 'നിലമ്പൂർ'); this.objective(); };
     if (skipIntro) { go(); return; }
     runCine([
-      { d: 5.2, start() { CC.rate = 1.2; CC.pos.set(GIANT.x + 8, H_START + 4, GIANT.z + 9); CC.look.set(GIANT.x, height(GIANT.x, GIANT.z) + 14, GIANT.z); dialog('Narrator', "Nilambur — home of Conolly's Plot, the oldest teak plantation in the world. Here stands Kannimari, a giant teak more than four hundred years old."); }, update(k) { CC.look.y = height(GIANT.x, GIANT.z) + 14 - k * 10; } },
+      { d: 5.2, start() { CC.rate = 1.2; CC.pos.set(GIANT.x + 8, H_START + 4, GIANT.z + 9); CC.look.set(GIANT.x, height(GIANT.x, GIANT.z) + 14, GIANT.z); dialog('Narrator', "Nilambur — home of Conolly's Plot, the oldest teak plantation in the world. One of the tallest teak trees in the world grows right here."); }, update(k) { CC.look.y = height(GIANT.x, GIANT.z) + 14 - k * 10; } },
       { d: 5.2, start() { CC.rate = 2; CC.pos.set(r.x - 2.4, r.y + 1.7, r.z - 2.6); CC.look.set(r.x, r.y + 1.4, r.z); dialog('Ranger Ammini', "Kaala's sawmill is across the Chaliyar river. But his men cut the hanging bridge! The river is full of teak logs floating downstream…"); } },
       { d: 4, start() { CC.pos.set(START.x - 1.5, H_START + 1.3, START.z - 4.6); CC.look.set(START.x, H_START + .8, START.z - 2); HN.bark = 1; sfx.bark(0, .4); dialog('Pichu', 'Then we\'ll hop across the logs! Mittu, we\'re almost there!'); } },
     ], go);
@@ -180,7 +207,7 @@ const level = {
     const s = G.stage;
     setObjective(
       s === 0 ? (alive(1) ? `Stop the poachers in the teak plantation (${3 - alive(1)}/3)` : `Cross the Chaliyar — JUMP from log to log (${MOBILE ? '⤒' : 'Space'})`) :
-      s === 1 ? (G.freed < 3 || alive(2) || alive(3) || alive(4) ? `Raid the logging camp and free the animals (${G.freed}/3)` : !L.clue.found ? 'Search the camp for a clue about Mittu (Q / 👃 SNIFF)' : 'The way to the sawmill is open!') :
+      s === 1 ? (G.freed < 3 || alive(2) || alive(3) || alive(4) ? `Raid the logging camp and free the animals (${G.freed}/3)` : !L.clue.found ? 'Search the camp for a clue about Mittu (Q / 👃 SNIFF)' : !L.key.got && !(G.keys > 0) ? 'Jump up the cut teak stumps by the camp to reach the key 🔑' : L.gates.g.open ? 'The way to the sawmill is open!' : 'Unlock the gate with the key 🔑') :
       s === 2 ? 'Go to Kaala\'s sawmill 🪚' : 'Defeat the Sawmill Boss!');
   },
 
@@ -193,12 +220,12 @@ const level = {
     }, 400);
   },
   checkGate() {
-    if (G.stage === 1 && L.wave4 && !alive(2) && !alive(3) && !alive(4) && G.freed >= 3 && L.clue.found && !L.gates.g.open) {
-      L.gates.g.openUp(); G.stage = 2; setCP(L, pathX(GZ - 2), GZ - 2); sfx.big(); popText('Camp cleared! 🪵');
+    if (G.stage === 1 && L.gates.g.open) {
+      G.stage = 2; setCP(L, pathX(GZ - 2), GZ - 2); sfx.big(); popText('Camp cleared! 🪵');
       dialog('Pichu', 'I can hear saws screaming up ahead… that must be Kaala\'s sawmill!', 4); this.objective();
     }
   },
-  action() { tryFreeCage(L, c => c.guard === 2 ? alive(2) > 0 : alive(3) > 0 || alive(4) > 0 || !L.wave4); this.checkGate(); this.objective(); },
+  action() { if (tryInteract(L)) { this.objective(); return; } tryFreeCage(L, c => c.guard === 2 ? alive(2) > 0 : alive(3) > 0 || alive(4) > 0 || !L.wave4); this.checkGate(); this.objective(); },
 
   startBoss() {
     L.walled = true; P.pos.set(AR.x, W.height(AR.x, AR.z + 8), AR.z + 8); P.yaw = PI; CAM.yaw = 0; G.stage = 3; setCP(L, AR.x, AR.z + 11); this.objective();
@@ -233,7 +260,7 @@ const level = {
     if (G.stage === 0 && !alive(1) && P.pos.z < RZ - 7.6 && W.walkable(P.pos.x, P.pos.z) && P.ground) { G.stage = 1; setCP(L, P.pos.x, P.pos.z); sfx.big(); popText('Across the Chaliyar! 🌊'); dialog('Pichu', 'We made it across! Honey, come on — the camp must be close.', 3); this.objective(); }
     if (P.pos.z < 50) wakeGroup(2);
     if (P.pos.z < 30) { wakeGroup(3); if (!L.campOn) { L.campOn = true; MUS.mood = 'battle'; dialog('Pichu', 'A logging camp — with animals in cages!', 3); } }
-    if (P.pos.z < -32) wakeGroup(5);
+    if (!L.gorgeMsg && P.pos.z < RVZ + 9 && G.stage >= 2) { L.gorgeMsg = true; dialog('Pichu', 'A rotten walkway over the gorge! The planks will break — I have to run across fast!', 4); }
     if (!L.walled && G.stage === 2 && P.pos.z < WALLZ - 1.5) this.startBoss();
     if (L.bossOn) { const dx = P.pos.x - AR.x, dz = P.pos.z - AR.z, d = Math.hypot(dx, dz); if (d > AR.r - .5) { P.pos.x = AR.x + dx / d * (AR.r - .5); P.pos.z = AR.z + dz / d * (AR.r - .5); } }
     this.objective();

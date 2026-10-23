@@ -21,6 +21,10 @@ import { CaptainSnare } from '../combat/bosses.js';
 import { ENEMIES, clearProjectiles } from '../combat/combat.js';
 import { animQuad } from '../actors/quad.js';
 import { makePuppy, puppyWhine, Clue } from '../world/story.js';
+import { Stone } from '../world/challenges.js';
+import { KeyItem, KeyGate, Chest, MapPiece } from '../world/treasure.js';
+import { Discovery } from '../world/discovery.js';
+import { crocodile, herb, treeSquirrel, viewpoint } from '../world/wildlife.js';
 
 /* ---------- world layout ---------- */
 const pathX = z => Math.sin(z * .02) * 11 + Math.sin(z * .05 + 1.3) * 4;
@@ -32,12 +36,16 @@ const CAMP = { x: pathX(8), z: 8 };
 const AR = { x: pathX(-97), z: -97, r: 13 };
 const PK = { x: AR.x + 2, z: AR.z - 25 };
 const G1Z = 106, G2Z = 48, G3Z = -24, WALLZ = AR.z + 15;
+const creekZ = x => 38 + Math.sin(x * .07) * 1.2;      // a creek across the trail, crossed on stepping stones
+const XC = pathX(38);
+const ROCK = { x: CAMP.x + 12, z: CAMP.z + 9 };         // the big rock where the key is hidden
 
 function baseH(x, z) {
   let h = fbm(x * .02 + 5.3, z * .02 - 3.1) * 4 + vnoise(x * .1, z * .1) * .3;
   h += 14.5 * smooth(-24, -86, z);
   const lm = smooth(50, 64, z);
   if (lm > 0) { const d = x - shoreX(z); h = lerp(h, .3, smooth(12, 3, d) * lm * .7); h = lerp(h, -3.4, smooth(1, -7, d) * lm); }
+  const cr = Math.abs(z - creekZ(x)); h = lerp(h, Math.max(h, .45), smooth(10, 5, cr)); h = lerp(h, -2.4, smooth(4.4, 3.4, cr));
   const ex = Math.max(0, Math.abs(x - pathX(z) * .4) - 44); h += ex * ex * .07;
   const es = Math.max(0, z - 124); h += es * es * .1;
   return h;
@@ -76,12 +84,12 @@ const level = {
   id: 1, name: 'Agasthya Hills', ml: 'അഗസ്ത്യമല', region: 'Agasthyamala · Thiruvananthapuram', music: 'forest', cages: 3,
   envKeys: [[999, 'morning'], [100, 'morning'], [60, 'noon'], [30, 'canopy'], [-15, 'canopy'], [-35, 'golden'], [-80, 'peakMist']],
   objectiveTarget() { return L?.target?.() ?? null; },
-  sniffTarget() { if (!L) return null; if (!L.clue.found) return { x: L.clue.x, z: L.clue.z, clue: true }; return this.objectiveTarget(); },
+  sniffTarget() { if (!L) return null; if (!L.clue.found) return { x: L.clue.x, z: L.clue.z, clue: true }; const mp = L.ticks.find(t => t instanceof MapPiece && !t.got); if (mp && !L.key.got) return mp; return this.objectiveTarget(); },
 
   build(root) {
     resetCollision(); seed(4242);
-    W.height = height; W.water = -.6; W.walkable = (x, z) => !(z > 50 && x < -8 && height(x, z) < W.water - .4); W.bounds = { x0: -56, x1: 56, z0: AR.z - 12.5, z1: 127 };
-    L = { root, ticks: [], cages: [], gates: {}, step: 0, tut: 0, cp: new THREE.Vector3(START.x, H_START, START.z - 2), bossOn: false, boss: null, wave3: false, walled: false, msgT: 0 };
+    W.height = height; W.water = -.6; W.walkable = (x, z) => { if (height(x, z) >= W.water - .35) return true; return !((z > 50 && x < -8) || Math.abs(z - creekZ(x)) < 5); }; W.bounds = { x0: -56, x1: 56, z0: AR.z - 12.5, z1: 127 };
+    L = { root, ticks: [], cages: [], gates: {}, inter: [], step: 0, tut: 0, cp: new THREE.Vector3(START.x, H_START, START.z - 2), bossOn: false, boss: null, wave3: false, walled: false, msgT: 0 };
     W.minZ = () => G.stage < 1 ? G1Z + .6 : !L.gates.g2.open ? G2Z + .7 : !L.gates.g3.open ? G3Z + .7 : -1e9;
     W.maxZ = () => L.walled ? WALLZ - .6 : 1e9;
     W.onGate = () => {
@@ -92,12 +100,14 @@ const level = {
     };
     buildTerrain(root, { w: 120, l: 260, cx: 0, cz: (W.bounds.z0 + 128) / 2, nx: 120, nz: 250, height, colour });
     buildWater(root, { x: -36, z: 96, w: 50, l: 80, y: W.water, repeat: [10, 16] });
+    buildWater(root, { x: 0, z: 38, w: 120, l: 10, y: W.water, repeat: [24, 2] });
+    W.platforms = [];
     this.plants(root); this.props(root); this.actors(root);
   },
 
   plants(root) {
     const F = new Flora(), tries = 16000 * Q.trees;
-    const clear = (x, z) => Math.hypot(x - START.x - 2, z - 116) < 13 || Math.hypot(x - CAMP.x, z - CAMP.z) < 14 || Math.hypot(x - AR.x, z - AR.z) < 15 || Math.hypot(x - HUT.x, z - HUT.z) < 6;
+    const clear = (x, z) => Math.hypot(x - START.x - 2, z - 116) < 13 || Math.hypot(x - CAMP.x, z - CAMP.z) < 14 || Math.hypot(x - AR.x, z - AR.z) < 15 || Math.hypot(x - HUT.x, z - HUT.z) < 6 || Math.abs(z - creekZ(x)) < 6 || Math.hypot(x - ROCK.x, z - ROCK.z) < 3;
     for (let i = 0; i < tries; i++) {
       const x = sr(-54, 54), z = sr(AR.z - 10, 128), y = height(x, z);
       if (y < W.water + .35) continue; const pd = Math.abs(x - pathX(z)); if (pd < 4.2) continue; if (clear(x, z)) continue;
@@ -142,7 +152,24 @@ const level = {
     new Crate(root, HUT.x - 3.5, HUT.z - 3, 'ammo'); new Crate(root, HUT.x - 4.4, HUT.z - 2.2, 'heal');
     L.gates.g1 = new Barricade(root, pathX(G1Z), G1Z, 8, 'bamboo');
     L.gates.g2 = new Barricade(root, pathX(G2Z), G2Z, 9, 'logs');
-    L.gates.g3 = new Barricade(root, pathX(G3Z), G3Z, 9, 'logs');
+    L.gates.g3 = new KeyGate(root, pathX(G3Z), G3Z, 8); L.inter.push(L.gates.g3);
+    // creek crossing: jump from stone to stone (one stone off to the side holds a map piece)
+    const top = W.water + .35; [[41, 0], [39, 1.6], [37, -.4], [35, 1.2]].forEach(([z, dx]) => new Stone(root, XC + dx, z, .65, top));
+    new Stone(root, XC + 5.2, 38.4, .7, top);
+    // treasure hunt: 3 torn pieces of the ranger's map → the key on the big rock near the camp
+    G.mapTotal = 3; const gotPiece = () => { if (G.mapPieces >= 3) { L.key.reveal(); dialog('Pichu', 'The map is complete! The X is on the big rock near the poacher camp — that\'s where the gate key is!', 4.5); } else dialog('Pichu', `A piece of the ranger\'s map! ${3 - G.mapPieces} more to find…`, 2.5); hud(); this.objective(); };
+    [[XC + 5.2, 38.4, top], [HUT.x + 2, HUT.z + 4.2], [shoreX(104) + 4, 104]].forEach(([x, z, y]) => L.ticks.push(new MapPiece(root, x, z, gotPiece, { y })));
+    new Stone(root, ROCK.x, ROCK.z, 1.2, height(ROCK.x, ROCK.z) + 1.05);
+    L.key = new KeyItem(root, ROCK.x, ROCK.z, { hidden: true, y: height(ROCK.x, ROCK.z) + 1.05, name: 'Gate key', onGet: () => { dialog('Pichu', 'Got the key! Now let\'s unlock the gate past the camp.', 3); this.objective(); } }); L.ticks.push(L.key);
+    // hidden treasure chests
+    [[shoreX(76) + 4, 76], [pathX(22) - 13, 22], [pathX(-42) + 9, -42]].forEach(([x, z]) => { const c = new Chest(root, x, z); L.inter.push(c); L.ticks.push(c); });
+    // the forest's animals and plants (Nature Book)
+    L.ticks.push(new Discovery(root, 'hornbill', pathX(92), 92, { r: 7, y: height(pathX(92), 92) + 3 }));
+    { const ts = treeSquirrel(root, pathX(84) + 5, 84, 5); L.ticks.push(ts, new Discovery(root, 'giantsquirrel', pathX(84) + 5, 84, { r: 8, y: ts.y() })); }
+    L.ticks.push(new Discovery(root, 'sambar', shoreX(96) + 7, 96, { r: 10, y: height(shoreX(96) + 7, 96) }));
+    L.ticks.push(herb(root, pathX(56) + 3, 56), new Discovery(root, 'arogyapacha', pathX(56) + 3, 56, { r: 4.5, y: height(pathX(56) + 3, 56) - 1 }));
+    L.ticks.push(crocodile(root, shoreX(108) + 1.2, 108, -PI / 2), new Discovery(root, 'mugger', shoreX(108) + 1.2, 108, { r: 9, y: height(shoreX(108) + 1.2, 108) }));
+    viewpoint(root, pathX(-62) + 4, -62, Math.atan2(PK.x - pathX(-62) - 4, PK.z + 62)); L.ticks.push(new Discovery(root, 'agasthyakoodam', pathX(-62) + 4, -62, { r: 5, y: height(pathX(-62) + 4, -62) }));
     // poacher camp
     makeTent(root, CAMP.x - 7, CAMP.z + 4, .5, 0x5a6a3a); makeTent(root, CAMP.x + 7.5, CAMP.z + 3, -.6, 0x6a5a3a); makeTent(root, CAMP.x + 2, CAMP.z - 9, PI, 0x4a5a4a);
     L.ticks.push(makeCampfire(root, CAMP.x, CAMP.z)); makeJeep(root, CAMP.x - 9, CAMP.z - 6, .8);
@@ -174,14 +201,12 @@ const level = {
     [[-3, 71], [3, 69], [0, 74]].forEach(([dx, z]) => new Enemy('grunt', pathX(z) + dx, z, root, { group: 1, yaw: 0 }));
     // group 2: camp guards
     [[-4, 4, 'grunt'], [5, 2, 'grunt'], [0, -3, 'grunt'], [-9, -2, 'slinger'], [10, -8, 'slinger']].forEach(([dx, dz, t]) => new Enemy(t, CAMP.x + dx, CAMP.z + dz, root, { group: 2 }));
-    // group 4: rocky climb
-    [[0, -50, 'grunt'], [-8, -56, 'slinger'], [8, -60, 'slinger']].forEach(([dx, z, t]) => new Enemy(t, pathX(z) + dx, z, root, { group: 4 }));
     // the boss waits on the plateau
     L.boss = new CaptainSnare(AR.x, AR.z - 5, root, { yaw: 0, group: 99, arena: AR, onPhase2: () => this.bossHelpers() });
     L.target = () => {
       if (G.stage === 0) return DUMMY;
       if (G.stage === 1) { if (groupAlive(1)) return { x: pathX(71), z: 71 }; const c = L.cages[0]; if (!c.free) return c; return { x: pathX(G2Z), z: G2Z }; }
-      if (G.stage === 2) { if (groupAlive(2) || groupAlive(3)) return CAMP; const c = L.cages.find(c => !c.free); if (c) return c; if (!L.clue.found) return L.clue; return { x: pathX(G3Z), z: G3Z }; }
+      if (G.stage === 2) { if (groupAlive(2) || groupAlive(3)) return CAMP; const c = L.cages.find(c => !c.free); if (c) return c; if (!L.clue.found) return L.clue; if (!L.key.got && G.mapPieces < 3) return L.ticks.find(t => t instanceof MapPiece && !t.got) || null; if (!L.key.got && !(G.keys > 0)) return L.key; return { x: pathX(G3Z), z: G3Z }; }
       if (G.stage === 3) return AR;
       return null;
     };
@@ -240,20 +265,25 @@ const level = {
     }, 400);
   },
   checkCamp() {
-    if (G.stage === 2 && L.wave3 && !groupAlive(2) && !groupAlive(3) && G.freed >= 3 && L.clue.found && !L.gates.g3.open) {
-      L.gates.g3.openUp(); G.stage = 3; L.cp.set(pathX(G3Z - 2), 0, G3Z - 2); L.cp.y = height(L.cp.x, L.cp.z); sfx.big(); popText('Camp cleared! 🏕️');
-      dialog('Pichu', 'All the animals are free! Captain Snare must know where Mittu is. Up to the peak, Honey!', 4); this.objective();
+    if (G.stage === 2 && L.wave3 && !groupAlive(2) && !groupAlive(3) && G.freed >= 3 && L.clue.found && !L.campDone) {
+      L.campDone = true; sfx.big(); popText('Camp cleared! 🏕️');
+      dialog('Pichu', G.mapPieces >= 3 ? 'All the animals are free! Now the key on the big rock…' : 'All the animals are free! But the gate north is locked. The ranger\'s torn map shows where the key is — let\'s find all the pieces!', 5); this.objective();
+    }
+    // the locked gate was opened with the key
+    if (G.stage === 2 && L.gates.g3.open) {
+      G.stage = 3; L.cp.set(pathX(G3Z - 2), 0, G3Z - 2); L.cp.y = height(L.cp.x, L.cp.z);
+      dialog('Pichu', 'The gate is open! Captain Snare must know where Mittu is. Up to the peak, Honey!', 4); this.objective();
     }
   },
   objective() {
     if (G.stage === 1) setObjective(groupAlive(1) ? `Beat the poachers on the trail (${3 - groupAlive(1)}/3)` : L.cages[0].free ? 'The trail is open — head to the poacher camp' : 'Free the trapped deer! (walk up to the cage, press E / ✋)');
-    else if (G.stage === 2) { const left = groupAlive(2) + groupAlive(3); setObjective(left || !L.wave3 ? `Raid the poacher camp! Poachers left: ${left || '?'} · Animals freed ${G.freed}/3` : G.freed < 3 ? `Free the trapped animals (${G.freed}/3)` : !L.clue.found ? 'Search the camp for a clue about Mittu (press Q / 👃 to SNIFF)' : 'Camp cleared!'); }
+    else if (G.stage === 2) { const left = groupAlive(2) + groupAlive(3); setObjective(left || !L.wave3 ? `Raid the poacher camp! Poachers left: ${left || '?'} · Animals freed ${G.freed}/3` : G.freed < 3 ? `Free the trapped animals (${G.freed}/3)` : !L.clue.found ? 'Search the camp for a clue about Mittu (press Q / 👃 to SNIFF)' : L.gates.g3.open ? 'The gate is open!' : G.keys > 0 ? 'Unlock the gate north of the camp 🔑' : G.mapPieces < 3 ? `Find the 3 torn pieces of the ranger\'s map (${G.mapPieces}/3) 🗺️` : 'Climb onto the big rock near the camp and grab the key 🔑'); }
     else if (G.stage === 3) setObjective('Climb to the plateau below Agasthyakoodam peak ⛰️');
     else if (G.stage === 4) setObjective('Defeat Captain Snare!');
   },
 
   action() {
-    const c = this.nearCage(); if (!c) return;
+    const c = this.nearCage(); if (!c) { const it = L.inter.find(o => o.canUse()); if (it) { it.use(); this.checkCamp(); this.objective(); } return; }
     if (groupAlive(c.guard) || (c.guard === 2 && (!L.wave3 || groupAlive(3)))) { dialog('Pichu', 'The poachers are still watching! I have to beat them first.', 2.5); return; }
     c.open(); popText(c.kind === 'squirrel' ? '🐿️ Giant squirrel freed!' : '🦌 Deer freed!'); hud();
     dialog('Pichu', pick(['Run, little one! You\'re free!', 'Go home to your family!', 'Nobody will trap you again!']), 2.5);
@@ -310,7 +340,6 @@ const level = {
     // triggers
     if (P.pos.z < 84) wakeGroup(1);
     if (P.pos.z < 26) { if (!L.campMsg) { L.campMsg = true; dialog('Pichu', 'There\'s the poacher camp! I can see animals in cages!', 3); MUS.mood = 'battle'; } wakeGroup(2); }
-    if (P.pos.z < -38) wakeGroup(4);
     if (!L.walled && G.stage === 3 && P.pos.z < WALLZ - 1.5) this.startBoss();
     if (L.bossOn) { const dx = P.pos.x - AR.x, dz = P.pos.z - AR.z, d = Math.hypot(dx, dz); if (d > AR.r + 1) { P.pos.x = AR.x + dx / d * (AR.r + 1); P.pos.z = AR.z + dz / d * (AR.r + 1); } }
     // music follows the action
@@ -333,7 +362,9 @@ const level = {
       L.farMsgT = (L.farMsgT || 0) - dt;
       if (L.tutT > 25 && L.tutHits === 0 && !L.tutHelp) { L.tutHelp = true; dialog('Ranger Ammini', mob ? 'Walk up close to the straw dummy, then tap the big red ⚔️ button!' : 'Walk up close to the straw dummy with W A S D, then press J or click!', 5); }
     } else {
-      const c = this.nearCage(); setPrompt(c ? (mob ? 'Tap ✋ to free the animal' : 'Press E to free the animal') : '');
+      const c = this.nearCage(), it = !c && L.inter.find(o => o.canUse()); setPrompt(c ? (mob ? 'Tap ✋ to free the animal' : 'Press E to free the animal') : it ? it.label() : '', !!c || (it && !/Locked/.test(it.label())));
+      if (!L.creekMsg && Math.abs(P.pos.z - creekZ(P.pos.x)) < 7 && G.stage >= 2) { L.creekMsg = true; dialog('Pichu', mob ? 'A creek! I\'ll jump from stone to stone — tap ⤒ to jump.' : 'A creek! I\'ll jump from stone to stone — press Space to jump.', 3.5); }
+      if (G.stage === 2 && L.gates.g3.open) this.checkCamp();
       // just-in-time tips
       let near = 0, sling = false, brute = false; for (const e of ENEMIES) if (e.alive && e.awake && !e.prop && Math.hypot(e.x - P.pos.x, e.z - P.pos.z) < 10) { near++; if (e.type === 'slinger') sling = true; }
       if (near >= 1) this.tip('smash', mob ? 'Tip: HOLD the orange 💥 button and let go for a POWER SMASH!' : 'Tip: HOLD K and let go for a POWER SMASH!');

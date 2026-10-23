@@ -21,7 +21,14 @@ import { Drone } from '../combat/drone.js';
 import { DroneMaster } from '../combat/bosses2.js';
 import { ENEMIES } from '../combat/combat.js';
 import { Clue, puppyWhine } from '../world/story.js';
-import { newRuntime, tickCommon, tryFreeCage, setCP, respawnReset, ambientBirds, alive } from './kit.js';
+import { newRuntime, tickCommon, tryFreeCage, tryInteract, setCP, respawnReset, ambientBirds, alive } from './kit.js';
+import { Guide, bell } from '../world/challenges.js';
+import { KeyItem, Chest } from '../world/treasure.js';
+import { Discovery } from '../world/discovery.js';
+import { viewpoint } from '../world/wildlife.js';
+import { makeQuad, animQuad, QUADS } from '../actors/quad.js';
+import { jitter as jit } from '../core/engine.js';
+import { addOb } from '../world/terrain.js';
 
 /* ---------- layout ---------- */
 const pathX = z => Math.sin(z * .021 + .5) * 9 + Math.sin(z * .06 + 2) * 3;
@@ -64,7 +71,7 @@ const level = {
   id: 3, name: 'Misty Shola', ml: 'ഇരവികുളം', region: 'Eravikulam · Munnar', music: 'forest', cages: 3,
   envKeys: [[999, 'teaMorning'], [78, 'teaMorning'], [64, 'mist'], [12, 'mist'], [2, 'highMist'], [-34, 'highMist'], [-62, 'summit']],
   objectiveTarget() { return L?.target?.() ?? null; },
-  sniffTarget() { if (!L) return null; if (!L.clue.found) return { x: L.clue.x, z: L.clue.z, clue: true }; return this.objectiveTarget(); },
+  sniffTarget() { if (!L) return null; if (!L.clue.found) return { x: L.clue.x, z: L.clue.z, clue: true }; if (!L.key.got && G.stage === 1) return L.guide.done ? L.key : { x: L.guide.x, z: L.guide.z }; return this.objectiveTarget(); },
 
   build(root) {
     resetCollision(); seed(6363);
@@ -131,6 +138,23 @@ const level = {
     [[pathX(56) + 14, 56, 0], [pathX(54) + 16, 53, 1], [pathX(30) - 15, 30, 0], [pathX(-14) + 14, -14, 0], [pathX(-16) + 16, -17, 1]].forEach(([x, z, f]) => L.ticks.push(sambar(root, x, z, !!f, 'tahr')));
     for (let i = 0; i < 2; i++) L.ticks.push(hornbillFlyer(root, pathX(100) + sr(-15, 15), sr(85, 115), sr(18, 26), sr(10, 16), sr(.05, .09) * (i % 2 ? 1 : -1), sr(0, TAU)));
     L.mist = mistField(root, 28); L.ticks.push(L.mist);
+    // the misty rock maze: three rock walls with one gap each; a tahr with a bell shows the way
+    const WALLS = [[32, 9], [26, -9], [20, 8]], rockM = std(0x7a7670, { flatShading: true, roughness: .95 });
+    for (const [wz, gx] of WALLS) { const gapX = pathX(wz) + gx; for (let x = pathX(wz) - 40; x < pathX(wz) + 40; x += 1.7) { if (Math.abs(x - gapX) < 2.7) continue; const z = wz + Math.sin(x * .7) * .3, s = sr(1, 1.5); M(jit(new THREE.DodecahedronGeometry(s, 1), .3), rockM, x, height(x, z) + s * .5, z, root).scale.set(1, 1.3, .9); addOb(x, z, s * .85); } }
+    const tq = makeQuad(QUADS.tahr); M(new THREE.SphereGeometry(.06, 8, 6), std(0xf2c230, { metalness: .8, roughness: .3 }), 0, .02, .08, tq.neck); root.add(tq.root);
+    const gpts = [{ x: pathX(37), z: 37 }, { x: pathX(32) + 9, z: 33.5 }, { x: pathX(32) + 9, z: 30.5 }, { x: pathX(26) - 9, z: 27.5 }, { x: pathX(26) - 9, z: 24.5 }, { x: pathX(20) + 8, z: 21.5 }, { x: pathX(20) + 8, z: 18.5 }, { x: pathX(16) + 2, z: 15.5 }];
+    L.guide = new Guide({ root: tq.root, anim: (dt, sp, t) => animQuad(tq, dt, sp, sp > .2 ? 'walk' : 'alert', t, { wag: .3 }) }, gpts, { speed: 2.6, wait: 9.5, sound: bell, onDone: () => { L.key.reveal(); dialog('Pichu', 'The tahr led us through the mist — and look, the tea-factory key!', 3.5); } });
+    L.ticks.push(L.guide);
+    L.key = new KeyItem(root, pathX(16) + 3.5, 14.5, { hidden: true, name: 'Tea-factory key', onGet: () => { dialog('Pichu', 'This key opens the vine gate up the next cliff!', 3); this.unlock(); this.objective(); } }); L.ticks.push(L.key);
+    // treasure
+    [[pathX(112) - 14, 112], [pathX(30) - 18, 29.5], [pathX(-30) + 13, -30]].forEach(([x, z]) => { const c = new Chest(root, x, z); L.inter.push(c); L.ticks.push(c); });
+    // Nature Book
+    L.ticks.push(new Discovery(root, 'tea', pathX(108) + 4, 108, { r: 6, y: height(pathX(108) + 4, 108) }));
+    L.ticks.push(new Discovery(root, 'tahr', pathX(55) + 12, 55, { r: 12, y: height(pathX(55) + 12, 55) }));
+    L.ticks.push(new Discovery(root, 'shola', pathX(62) - 6, 62, { r: 8, y: height(pathX(62) - 6, 62) + 2 }));
+    L.ticks.push(new Discovery(root, 'kurinji', pathX(-12) + 3, -12, { r: 6, y: height(pathX(-12) + 3, -12) }));
+    { const vx = pathX(-60) + 4, vz = -60; viewpoint(root, vx, vz, Math.PI); L.ticks.push(new Discovery(root, 'anamudi', vx, vz, { r: 5, y: height(vx, vz) }));
+      const peak = new THREE.Mesh(new THREE.ConeGeometry(70, 60, 7), new THREE.MeshBasicMaterial({ color: 0x8a9ab8, fog: false })); peak.position.set(vx - 30, height(vx, vz) + 10, vz - 190); root.add(peak); }
     L.clue = new Clue(root, pathX(46) + 5, 50, 'radio', () => {
       puppyWhine(.25); dialog('Radio', "*crackle* …Kaala here. Bring the puppy to Silent Valley. Nobody will hear her bark there… *crackle*", 5.5);
       setTimeout(() => { dialog('Pichu', 'That was Mittu whimpering on the radio! She\'s alive! Silent Valley — we have to hurry!', 4.5); HN.bark = 1; }, 5600);
@@ -144,12 +168,11 @@ const level = {
     [[-3, 96, 'grunt'], [4, 93, 'grunt']].forEach(([dx, z, t]) => new Enemy(t, pathX(z) + dx, z, root, { group: 1 }));
     [[-6, 98], [7, 90]].forEach(([dx, z]) => new Drone(pathX(z) + dx, z, root, { group: 1 }));
     [[0, 48, 'brute'], [-8, 44, 'slinger'], [8, 41, 'slinger']].forEach(([dx, z, t]) => new Enemy(t, pathX(z) + dx, z, root, { group: 2, aggro: 9 }));
-    new Enemy('grunt', pathX(25), 25, root, { group: 3, aggro: 9 }); [[-7, 27], [7, 24], [0, 19]].forEach(([dx, z]) => new Drone(pathX(z) + dx, z, root, { group: 3 }));
     [[0, -36, 'brute'], [-8, -42, 'slinger']].forEach(([dx, z, t]) => new Enemy(t, pathX(z) + dx, z, root, { group: 4 })); [[6, -30], [-6, -46]].forEach(([dx, z]) => new Drone(pathX(z) + dx, z, root, { group: 4 }));
     L.boss = new DroneMaster(root, AR.x, AR.z, { arena: AR, yaw: 0 });
     L.target = () => {
       if (G.stage === 0) { if (alive(1)) return { x: pathX(95), z: 95 }; if (!L.cages[0].free) return L.cages[0]; return L.l1; }
-      if (G.stage === 1) { if (alive(2)) return { x: pathX(45), z: 45 }; if (!L.cages[1].free) return L.cages[1]; if (alive(3)) return { x: pathX(24), z: 24 }; if (!L.cages[2].free) return L.cages[2]; if (!L.clue.found) return L.clue; return L.l2; }
+      if (G.stage === 1) { if (alive(2)) return { x: pathX(45), z: 45 }; if (!L.cages[1].free) return L.cages[1]; if (!L.clue.found) return L.clue; if (!L.key.got) return L.guide.done ? L.key : { x: L.guide.x, z: L.guide.z }; if (!L.cages[2].free) return L.cages[2]; return L.l2; }
       if (G.stage === 2) return AR;
       if (G.stage === 3) return L.antennas.find(a => a.alive) || null;
       return null;
@@ -172,7 +195,7 @@ const level = {
     const s = G.stage, f = G.freed;
     setObjective(
       s === 0 ? (alive(1) ? 'Poachers in the tea! Beat them (drones too 🎯)' : !L.cages[0].free ? 'Free the baby tahr (press E / ✋)' : 'Climb the vines up the cliff (walk into them)') :
-      s === 1 ? (alive(2) || alive(3) || f < 3 ? `Find the trapped tahr in the mist · freed ${f}/3` : !L.clue.found ? 'Something is crackling in the poachers\' camp… find it (Q / 👃 SNIFF)' : 'Climb the second cliff') :
+      s === 1 ? (alive(2) ? `Find the trapped tahr in the mist · freed ${f}/3` : !L.clue.found ? 'Something is crackling in the poachers\' camp… find it (Q / 👃 SNIFF)' : !L.key.got ? 'Lost in the mist! Follow the tahr\'s bell 🔔 through the rock maze' : f < 3 ? `Free the trapped tahr (${f}/3)` : 'Climb the second cliff') :
       s === 2 ? 'Climb to the summit rocks below Anamudi ⛰️' :
       s === 3 ? `Break the antennas that power his shield (${3 - L.antennas.filter(a => a.alive).length}/3)` : 'Defeat the Drone Master!');
   },
@@ -183,9 +206,9 @@ const level = {
   },
   unlock() {
     if (L.l1.locked && !alive(1) && L.cages[0].free) { L.l1.locked = false; sfx.big(); popText('Tea estate cleared! 🍃'); dialog('Pichu', 'The way is clear. Let\'s climb those vines!', 3); }
-    if (L.l2.locked && !alive(2) && !alive(3) && G.freed >= 3 && L.clue.found) { L.l2.locked = false; sfx.big(); popText('All tahr rescued! 🐐'); dialog('Pichu', 'Every tahr is free! Up the next cliff, Honey!', 3); }
+    if (L.l2.locked && !alive(2) && G.freed >= 3 && L.clue.found && L.key.got) { L.l2.locked = false; sfx.big(); popText('All tahr rescued! 🐐'); dialog('Pichu', 'Every tahr is free! Up the next cliff, Honey!', 3); }
   },
-  action() { tryFreeCage(L, c => alive(c.guard) > 0); this.unlock(); this.objective(); },
+  action() { if (tryInteract(L)) { this.objective(); return; } tryFreeCage(L, c => alive(c.guard) > 0); this.unlock(); this.objective(); },
 
   startBoss() {
     L.walled = true; P.pos.set(AR.x, W.height(AR.x, AR.z + 5), AR.z + 5); P.yaw = PI; CAM.yaw = 0; G.stage = 3; setCP(L, AR.x, AR.z + 12); this.objective();
@@ -218,7 +241,7 @@ const level = {
     if (!tickCommon(L, dt, t, 'forest')) return;
     if (P.pos.z < 104) wakeGroup(1);
     if (P.pos.z < 56) wakeGroup(2);
-    if (P.pos.z < 34) wakeGroup(3);
+    if (P.pos.z < 42 && G.stage >= 1 && !L.guide.active) { L.guide.active = true; dialog('Pichu', 'I can\'t see the way in this mist… Listen! A bell — that tahr is showing us the path!', 4); }
     if (P.pos.z < -24) wakeGroup(4);
     if (!L.walled && G.stage === 2 && P.pos.z < WALLZ - 1.5) this.startBoss();
     if (L.bossOn) { const dx = P.pos.x - AR.x, dz = P.pos.z - AR.z, d = Math.hypot(dx, dz); if (d > AR.r - .5) { P.pos.x = AR.x + dx / d * (AR.r - .5); P.pos.z = AR.z + dz / d * (AR.r - .5); } }

@@ -283,7 +283,7 @@ export function updatePlayer(dt) {
     sfx.splash(); emit(TEX.puff, P.pos.clone().setY(W.water + .2), 18, { color: 0xdff4ff, size: .4, speed: 3, g: -9, life: .8, spread: .2 }); buzz(100);
     P.pos.copy(P.lastSafe); P.vy = 0; P.kb.set(0, 0, 0); P.act = null;
     if (P.invul <= 0) { P.hp = Math.max(1, P.hp - 6); P.invul = 1; hud(); }
-    dialog('Pichu', pick(['Splash! Brrr, cold water!', 'Whoops! Jump when the log is close!', 'Splashy splash! Try again, Pichu!']), 2.2);
+    dialog('Pichu', pick(['Splash! Brrr, cold water!', "Whoops! Let's try that again!", 'Splashy splash! Try again, Pichu!']), 2.2);
   }
   if (P.ground) { P.airT = 0; if (!P.plat && W.walkable(P.pos.x, P.pos.z)) P.lastSafe.copy(P.pos); } else P.airT += dt;
   if (P.jumpBuf > 0) { P.jumpBuf -= dt; if (P.ground) doJump(); }

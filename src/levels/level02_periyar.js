@@ -22,7 +22,11 @@ import { Drone } from '../combat/drone.js';
 import { JeepTrapper } from '../combat/bosses2.js';
 import { ENEMIES } from '../combat/combat.js';
 import { Clue, puppyWhine } from '../world/story.js';
-import { newRuntime, tickCommon, tryFreeCage, nearCage, setCP, respawnReset, ambientBirds, alive } from './kit.js';
+import { newRuntime, tickCommon, tryFreeCage, tryInteract, nearCage, setCP, respawnReset, ambientBirds, alive } from './kit.js';
+import { Stone } from '../world/challenges.js';
+import { KeyItem, KeyGate, Chest } from '../world/treasure.js';
+import { Discovery } from '../world/discovery.js';
+import { gaur, otters, darter } from '../world/wildlife.js';
 
 /* ---------- layout ---------- */
 const pathX = z => Math.sin(z * .018 + 1) * 10 + Math.sin(z * .047) * 3;
@@ -74,7 +78,7 @@ const level = {
   id: 2, name: 'Periyar Lake', ml: 'പെരിയാർ', region: 'Periyar Tiger Reserve · Idukki', music: 'forest', cages: 3,
   envKeys: [[999, 'morning'], [104, 'morning'], [84, 'lake'], [20, 'lake'], [-12, 'noon'], [-45, 'golden'], [-72, 'sunsetGold']],
   objectiveTarget() { return L?.target?.() ?? null; },
-  sniffTarget() { if (!L) return null; if (!L.clue.found) return { x: L.clue.x, z: L.clue.z, clue: true }; return this.objectiveTarget(); },
+  sniffTarget() { if (!L) return null; if (G.stage === 3 && !L.key.got) return L.key; if (!L.clue.found) return { x: L.clue.x, z: L.clue.z, clue: true }; return this.objectiveTarget(); },
 
   build(root) {
     resetCollision(); seed(5151);
@@ -133,7 +137,23 @@ const level = {
     [[3, -6, 'ammo'], [-5, -7, 'heal'], [7, 4, 'ammo'], [-10, -2, 'ammo']].forEach(([dx, dz, l]) => new Crate(root, OUT.x + dx, OUT.z + dz, l));
     L.cages.push(Object.assign(new Cage(root, OUT.x - 6, OUT.z - 5, 'calf', 0), { guard: 21 }));
     L.cages.push(Object.assign(new Cage(root, OUT.x + 6, OUT.z - 8, 'sambar', 0), { guard: 21 }));
-    L.gates.g = new Barricade(root, pathX(GZ), GZ, 9, 'logs');
+    L.gates.g = new KeyGate(root, pathX(GZ), GZ, 8);
+    const outpostDone = () => L.wave2 && !alive(21) && !alive(22) && G.freed >= 3 && L.clue.found;
+    L.inter.push({ canUse: () => L.gates.g.canUse(), label: () => L.gates.g.label(), use: () => { if (!outpostDone()) { dialog('Pichu', 'First let\'s free all the animals and find a clue about Mittu.', 3); return true; } const ok = L.gates.g.use(); this.checkOutpost(); return ok; } });
+    // stump hopping beside the island: each dead stump is a little higher — the boathouse key is on the last one
+    const sw = [[-8.4, -3, .7], [-10.6, -4.6, 1.15], [-12.8, -3.2, 1.6], [-15, -4.8, 2.05]];
+    sw.forEach(([dx, dz, h]) => new Stone(root, ISL.x + dx, ISL.z + dz, .62, W.water + h, 'stump'));
+    const last = sw[sw.length - 1];
+    L.key = new KeyItem(root, ISL.x + last[0], ISL.z + last[1], { y: W.water + last[2], name: 'Boathouse key', onGet: () => { dialog('Pichu', 'The boathouse key! The poachers\' outpost gate must use this. Back to the raft!', 3.5); this.objective(); } }); L.ticks.push(L.key);
+    // treasure
+    [[ISL.x + 3.5, ISL.z + 4], [pathX(4) - 16, 4], [OUT.x + 12, OUT.z + 10]].forEach(([x, z]) => { const c = new Chest(root, x, z); L.inter.push(c); L.ticks.push(c); });
+    // Nature Book: animals of Periyar
+    L.ticks.push(new Discovery(root, 'deadtrees', JET.x + .5, 80, { r: 6, y: W.water }));
+    { const sx = JET.x + 7, sz = 73; new Stone(root, sx, sz, .5, W.water + 2.6, 'stump'); L.ticks.push(darter(root, sx, W.water + 2.6, sz, PI), new Discovery(root, 'darter', sx, sz, { r: 9, y: W.water + 2.6 })); }
+    L.ticks.push(otters(root, ISL.x + 7, ISL.z + 6, W.water), new Discovery(root, 'otter', ISL.x + 7, ISL.z + 6, { r: 9, y: W.water }));
+    L.ticks.push(new Discovery(root, 'elephant', pathX(2), 2, { r: 13, y: height(pathX(2), 2) + 1 }));
+    L.ticks.push(new Discovery(root, 'tiger', TIG.x, TIG.z, { r: 15, y: height(TIG.x, TIG.z) + 1 }));
+    { const gx = pathX(-48) + 12, gz = -48; L.ticks.push(gaur(root, gx, gz, -PI / 2), new Discovery(root, 'gaur', gx, gz, { r: 11, y: height(gx, gz) })); }
     L.clue = new Clue(root, OUT.x - 1, OUT.z - 12, 'blanket', () => { dialog('Pichu', "Mittu's little blanket! It still smells of her — Honey's tail is wagging like crazy!", 4.5); HN.bark = 1; this.checkOutpost(); this.objective(); }); L.ticks.push(L.clue);
     // arena pillars
     L.pillars = []; for (let i = 0; i < 4; i++) { const a = PI / 4 + i * PI / 2, x = AR.x + Math.sin(a) * 8, z = AR.z + Math.cos(a) * 8; rockPillar(root, x, z, 1.4, 5); L.pillars.push({ x, z, r: 1.4 }); }
@@ -164,7 +184,7 @@ const level = {
       if (G.stage === 0) return { x: pathX(104), z: 104 };
       if (G.stage === 1) return L.raft;
       if (G.stage === 2 || G.stage === 4) return null;
-      if (G.stage === 3) { const c = L.cages[0]; if (alive(12)) return ISL; if (!c.free) return c; return L.raft; }
+      if (G.stage === 3) { const c = L.cages[0]; if (alive(12)) return ISL; if (!c.free) return c; if (!L.key.got) return L.key; return L.raft; }
       if (G.stage === 5) { if (alive(21) || alive(22)) return OUT; const c = L.cages.find(c => !c.free); if (c) return c; if (!L.clue.found) return L.clue; return { x: pathX(GZ), z: GZ }; }
       if (G.stage === 6) return AR;
       return null;
@@ -189,9 +209,9 @@ const level = {
       s === 0 ? `Beat the poachers at the boat landing (${3 - alive(1)}/3)` :
       s === 1 ? 'Walk onto the bamboo raft at the end of the jetty' :
       s === 2 ? 'Drones! Knock them down with your slingshot 🎯 (or hit them when they swoop low)' :
-      s === 3 ? (alive(12) ? 'Clear the island and free the trapped deer' : !L.cages[0].free ? 'Free the trapped deer on the island (press E / ✋)' : 'Back on the raft!') :
+      s === 3 ? (alive(12) ? 'Clear the island and free the trapped deer' : !L.cages[0].free ? 'Free the trapped deer on the island (press E / ✋)' : !L.key.got ? 'Hop across the dead tree stumps to grab the boathouse key 🔑 (jump!)' : 'Back on the raft!') :
       s === 4 ? 'Keep the drones off the raft!' :
-      s === 5 ? (alive(21) || alive(22) ? `Raid the poacher outpost · animals freed ${G.freed}/3` : G.freed < 3 ? `Free the trapped animals (${G.freed}/3)` : !L.clue.found ? 'Search the outpost for a clue about Mittu (Q / 👃 SNIFF)' : 'The way north is open!') :
+      s === 5 ? (alive(21) || alive(22) ? `Raid the poacher outpost · animals freed ${G.freed}/3` : G.freed < 3 ? `Free the trapped animals (${G.freed}/3)` : !L.clue.found ? 'Search the outpost for a clue about Mittu (Q / 👃 SNIFF)' : L.gates.g.open ? 'The way north is open!' : 'Unlock the outpost gate with the boathouse key 🔑') :
       s === 6 ? 'Find the Jeep Trapper in the grassland clearing' : 'Defeat the Jeep Trapper!');
   },
 
@@ -200,17 +220,18 @@ const level = {
     const g = e.group;
     setTimeout(() => {
       if (g === 1 && !alive(1) && G.stage === 0) { G.stage = 1; sfx.big(); popText('Landing cleared! ⚔️'); setCP(L, JET.x, 99); dialog('Pichu', 'The way to the jetty is clear. All aboard the raft, Honey!', 3.5); }
-      if (g === 21 && !alive(21) && !L.wave2) { L.wave2 = true; dialog('Poacher', 'Intruders! Send the drones!', 2.5); [[-6, -12], [6, -14]].forEach(([dx, dz]) => new Drone(OUT.x + dx, OUT.z + dz, L.root, { group: 22, awake: true })); new Enemy('brute', OUT.x, OUT.z - 16, L.root, { group: 22, awake: true }); }
+      if (g === 21 && !alive(21) && !L.wave2) { L.wave2 = true; dialog('Poacher', 'Intruders! Send the drones!', 2.5); [[-6, -12], [6, -14]].forEach(([dx, dz]) => new Drone(OUT.x + dx, OUT.z + dz, L.root, { group: 22, awake: true })); }
       this.checkOutpost(); this.objective();
     }, 400);
   },
   checkOutpost() {
-    if (G.stage === 5 && L.wave2 && !alive(21) && !alive(22) && G.freed >= 3 && L.clue.found && !L.gates.g.open) {
-      L.gates.g.openUp(); G.stage = 6; setCP(L, pathX(GZ - 2), GZ - 2); sfx.big(); popText('Outpost cleared! 🏕️');
+    if (G.stage === 5 && L.gates.g.open) {
+      G.stage = 6; setCP(L, pathX(GZ - 2), GZ - 2); sfx.big(); popText('Outpost cleared! 🏕️');
       dialog('Pichu', 'All the animals are safe! I can hear a jeep engine up ahead…', 4); this.objective();
     }
   },
   action() {
+    if (tryInteract(L)) { this.objective(); return; }
     tryFreeCage(L, c => c.guard === 12 ? alive(12) > 0 : alive(21) > 0 || (!L.wave2) || alive(22) > 0);
     if (G.stage === 3 && L.cages[0].free && !alive(12) && !L.toldBack) { L.toldBack = true; dialog('Pichu', 'The deer is free! Back to the raft!', 2.5); }
     this.checkOutpost(); this.objective();
@@ -225,7 +246,7 @@ const level = {
     } else {
       dialog('Pichu', 'Next stop — the north shore!', 2.2);
       L.raft.goTo(ROUTE.length - 1, () => { G.stage = 5; L.leg = 0; setCP(L, NDOCK.x, 10); dialog('Pichu', 'Dry land! The poacher outpost must be up this trail.', 3); this.objective(); });
-      setTimeout(() => { if (L.leg === 2) [[-9, 0], [9, -2], [0, -6]].forEach(([dx, dz]) => new Drone(L.raft.x + dx, L.raft.z - 10 + dz, L.root, { group: 13, awake: true })); }, 3000);
+      setTimeout(() => { if (L.leg === 2) [[-9, 0], [9, -2]].forEach(([dx, dz]) => new Drone(L.raft.x + dx, L.raft.z - 10 + dz, L.root, { group: 13, awake: true })); }, 3000);
     }
   },
 
@@ -274,8 +295,8 @@ const level = {
     if (P.pos.z < 112) wakeGroup(1);
     if (G.stage === 0 && alive(1)) { /* fight */ }
     if (G.stage === 1 && P.plat === L.raft && !L.leg) this.startLeg(1);
-    if (G.stage === 3 && P.plat === L.raft && !L.leg && L.cages[0].free && !alive(12)) this.startLeg(2);
-    if (G.stage === 3 && P.plat === L.raft && !L.leg && (!L.cages[0].free || alive(12)) && L.msgT <= 0) { L.msgT = 5; dialog('Pichu', 'Wait — the deer on the island still needs help!', 2.5); }
+    if (G.stage === 3 && P.plat === L.raft && !L.leg && L.cages[0].free && !alive(12) && L.key.got) this.startLeg(2);
+    if (G.stage === 3 && P.plat === L.raft && !L.leg && (!L.cages[0].free || alive(12) || !L.key.got) && L.msgT <= 0) { L.msgT = 5; dialog('Pichu', !L.cages[0].free || alive(12) ? 'Wait — the deer on the island still needs help!' : 'Wait — I saw a key on top of those dead tree stumps!', 2.5); }
     if (G.stage >= 5 && P.pos.z < -6 && !L.tigerSeen) this.tigerScene();
     if (P.pos.z < -18) wakeGroup(21);
     if (!L.walled && G.stage === 6 && P.pos.z < WALLZ - 1.5) this.startBoss();

@@ -25,7 +25,12 @@ import { Drone } from '../combat/drone.js';
 import { Kaala } from '../combat/bosses5.js';
 import { ENEMIES } from '../combat/combat.js';
 import { Clue, puppyWhine, makePuppy } from '../world/story.js';
-import { newRuntime, tickCommon, tryFreeCage, setCP, respawnReset, ambientBirds, alive } from './kit.js';
+import { newRuntime, tickCommon, tryFreeCage, tryInteract, setCP, respawnReset, ambientBirds, alive } from './kit.js';
+import { Stone, TorchPuzzle, Boulder, symTex } from '../world/challenges.js';
+import { KeyItem, KeyGate, Chest } from '../world/treasure.js';
+import { Discovery } from '../world/discovery.js';
+import { viewpoint } from '../world/wildlife.js';
+import { elephantWalker } from '../world/props2.js';
 
 /* ---------- layout ---------- */
 const pathX = z => Math.sin(z * .02 + .8) * 9 + Math.sin(z * .05 + 2.5) * 3.5;
@@ -79,6 +84,7 @@ const level = {
     if (!L) return null;
     if (L.bossOn && L.boss.st === 'trick') return { x: L.boss.x, z: L.boss.z };    // Honey sniffs out the real Kaala
     if (!L.clue.found) return { x: L.clue.x, z: L.clue.z, clue: true };
+    if (!L.key.hidden && !L.key.got) return L.key;
     return this.objectiveTarget();
   },
 
@@ -88,13 +94,14 @@ const level = {
     W.walkable = () => true;
     WX.rain = 0; WX.night = 0;
     L = newRuntime(root, { stage: 0 }); setCP(L, START.x, START.z - 2);
-    W.minZ = () => !L.gates.g.open ? GZ + .7 : -1e9;
+    W.minZ = () => !L.doorOpen ? CAVE + 1.2 : !L.gates.g.open ? GZ + .7 : -1e9;
     W.maxZ = () => L.walled ? WALLZ - .6 : 1e9;
     W.onGate = () => {
       if (L.msgT > 0) return; L.msgT = 4;
       if (L.l1.locked) dialog('Pichu', 'Kaala\'s men are guarding the coffee estate. Let\'s clear them first!', 3);
       else if (L.l2.locked) dialog('Pichu', 'Drones by the waterfall! I can\'t climb with them buzzing around.', 3);
-      else dialog('Pichu', 'A rock wall! We still need to free the animals and follow Mittu\'s trail.', 3);
+      else if (!L.doorOpen) dialog('Pichu', 'A stone door blocks the cave! The carving shows four signs… maybe the torches must be lit in that order.', 4);
+      else dialog('Pichu', 'A locked gate! Kaala must have the key hidden somewhere in this cave.', 3);
     };
     W.onClimbTop = l => { setCP(L, l.x, l.z - 3); sfx.collect(); if (l === L.l2) { G.stage = Math.max(G.stage, 1); dialog('Pichu', 'Up and over Meenmutty! The Edakkal caves are just ahead.', 3.5); } this.objective(); };
     buildTerrain(root, { w: 108, l: 255, cx: 0, cz: (W.bounds.z0 + 128) / 2, nx: 108, nz: 245, height, colour });
@@ -152,7 +159,32 @@ const level = {
     L.cages.push(Object.assign(new Cage(root, pathX(-34) + 3.5, -34, 'spotted', 0), { guard: 5 }));
     L.clue = new Clue(root, pathX(-46), -46, 'print', () => { puppyWhine(.3); dialog('Pichu', "Tiny paw prints — Mittu's! And they're fresh… listen! I can hear her crying up ahead!", 5); HN.bark = 1; this.checkGate(); this.objective(); });
     L.ticks.push(L.clue);
-    L.gates.g = new Barricade(root, pathX(GZ), GZ, 8, 'logs');
+    L.gates.g = new KeyGate(root, pathX(GZ), GZ, 7); L.inter.push(L.gates.g);
+    // Edakkal stone door + torch puzzle: light the torches in the order shown on the carving
+    { const px = pathX(CAVE); L.door = M(jitter(new THREE.BoxGeometry(6.6, 6.4, 1, 3, 3, 1), .12), std(0x5a5048, { flatShading: true }), px, height(px, CAVE) + 3.1, CAVE - .2, root);
+      const syms = ['sun', 'elephant', 'man', 'grid'], order = [2, 0, 3, 1];
+      const tp = [[-6, 8], [-2.4, 10.5], [2.4, 10.5], [6, 8]].map(([dx, dz], i) => ({ x: pathX(CAVE + dz) + dx, z: CAVE + dz, sym: syms[i] }));
+      L.puzzle = new TorchPuzzle(root, tp, order, () => { L.doorOpen = true; L.doorT = 0; sfx.smash(); G.shake = .5; setCP(L, px, CAVE + 4); dialog('Pichu', 'The stone door is opening! Just like the carving said!', 3); this.objective(); });
+      L.inter.push(L.puzzle); L.ticks.push(L.puzzle);
+      // the carving that shows the order
+      const c = document.createElement('canvas'); c.width = 256; c.height = 72; const g = c.getContext('2d'); g.fillStyle = '#3a2e24'; g.fillRect(0, 0, 256, 72);
+      order.forEach((k, i) => { g.drawImage(symTex(syms[k]).image, 6 + i * 64, 8, 52, 52); if (i < 3) { g.fillStyle = '#ffd8a0'; g.font = 'bold 22px Arial'; g.fillText('›', 56 + i * 64, 42); } });
+      const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+      const pan = new THREE.Mesh(new THREE.PlaneGeometry(3.4, .96), new THREE.MeshBasicMaterial({ map: tex })); pan.position.set(px, height(px, CAVE) + 4.6, CAVE + .45); root.add(pan); }
+    // Kaala's key on a stone altar — appears when the cave tasks are done, and wakes a rolling boulder
+    { const ax = pathX(-24) - 3.5, az = -24; new Stone(root, ax, az, .8, height(ax, az) + .9);
+      L.key = new KeyItem(root, ax, az, { hidden: true, y: height(ax, az) + .9, name: "Kaala's gate key", onGet: () => { dialog('Pichu', 'Got it! Uh oh… the ground is shaking — RUN to the gate!', 3); setTimeout(() => L.boulder.start(), 900); this.objective(); } }); L.ticks.push(L.key);
+      L.keySpot = new THREE.Vector3(pathX(-26), height(pathX(-26), -26), -26);
+      const bp = []; for (let z = -12; z >= -50; z -= 2) bp.push({ x: pathX(z), z }); L.boulder = new Boulder(root, bp, 5.2, 1.7); }
+    // treasure
+    [[pathX(116) + 13, 116], [FALLX(C1) + 7, C1 + 7], [pathX(-14) + 4, -14]].forEach(([x, z]) => { const c = new Chest(root, x, z); L.inter.push(c); L.ticks.push(c); });
+    // Nature Book
+    L.ticks.push(new Discovery(root, 'coffee', pathX(112) + 3, 112, { r: 5, y: H_START }));
+    L.ticks.push(new Discovery(root, 'meenmutty', FALLX(C1) + 3, C1 + 5, { r: 9, y: height(FALLX(C1), C1 + 5) + 2 }));
+    { const ex = pathX(45), pts = [{ x: ex - 18, z: 46, wait: 5 }, { x: ex - 6, z: 43 }, { x: ex + 14, z: 47, wait: 6 }, { x: ex + 2, z: 50 }]; L.ticks.push(elephantWalker(root, pts, 1, 1)); L.ticks.push(new Discovery(root, 'wyelephant', ex - 4, 46, { r: 14, y: height(ex, 46) + 2 })); }
+    { const vx = pathX(30) - 5, vz = 30; viewpoint(root, vx, vz, -PI / 2); L.ticks.push(new Discovery(root, 'chembra', vx, vz, { r: 5, y: height(vx, vz) }));
+      const peak = new THREE.Mesh(new THREE.ConeGeometry(60, 45, 7), new THREE.MeshBasicMaterial({ color: 0x7a9a7a, fog: false })); peak.position.set(vx - 170, height(vx, vz) + 4, vz - 20); root.add(peak); }
+    L.ticks.push(new Discovery(root, 'edakkal', pathX(10) - 6, 10, { r: 6, y: height(pathX(10), 10) + 1 }));
     // Mittu's cage high on Kaala's rock
     L.mittu = mittuCage(root, MITTU.x, MITTU.z);
     // light the lair so Kaala and his red warnings are easy to see
@@ -172,12 +204,11 @@ const level = {
     [[-3, 108, 'grunt'], [3, 105, 'grunt'], [0, 100, 'brute']].forEach(([dx, z, t]) => new Enemy(t, pathX(z) + dx, z, root, { group: 1 }));
     [[-6, 82], [6, 78]].forEach(([dx, z]) => new Drone(pathX(z) + dx, z, root, { group: 2 })); new Enemy('slinger', pathX(80) + 5, 80, root, { group: 2 });
     [[0, 48, 'brute'], [-6, 44, 'grunt'], [7, 40, 'slinger']].forEach(([dx, z, t]) => new Enemy(t, pathX(z) + dx, z, root, { group: 3 })); new Drone(pathX(46) - 8, 46, root, { group: 3 });
-    [[-2, 2, 'grunt'], [2, -2, 'grunt'], [0, -8, 'slinger']].forEach(([dx, z, t]) => new Enemy(t, pathX(z) + dx, z, root, { group: 4, aggro: 9 }));
     [[0, -28, 'brute'], [-2, -36, 'grunt']].forEach(([dx, z, t]) => new Enemy(t, pathX(z) + dx, z, root, { group: 5, aggro: 9 })); [[-3, -30], [3, -38]].forEach(([dx, z]) => new Drone(pathX(z) + dx, z, root, { group: 5 }));
     L.boss = new Kaala(root, AR, AR.x, AR.z - 6, { yaw: 0, onPhase: n => this.onPhase(n) });
     L.target = () => {
       if (G.stage === 0) { if (alive(1)) return { x: pathX(104), z: 104 }; if (alive(2)) return { x: pathX(80), z: 80 }; return L.l2.locked ? L.l1 : L.l2; }
-      if (G.stage === 1) { for (const [g, c] of [[3, 0], [4, 1], [5, 2]]) if (alive(g) || !L.cages[c].free) return L.cages[c]; if (!L.clue.found) return L.clue; return { x: pathX(GZ), z: GZ }; }
+      if (G.stage === 1) { for (const [g, c] of [[3, 0], [4, 1], [5, 2]]) if (alive(g) || !L.cages[c].free) return L.cages[c]; if (!L.clue.found) return L.clue; if (!L.key.got && !(G.keys > 0)) return L.key; return { x: pathX(GZ), z: GZ }; }
       if (G.stage === 2) return AR;
       return null;
     };
@@ -199,7 +230,7 @@ const level = {
     const s = G.stage;
     setObjective(
       s === 0 ? (alive(1) ? `Clear Kaala's men from the coffee estate (${3 - alive(1)}/3)` : L.l1.locked ? 'Climb the vines beside Meenmutty Falls' : alive(2) ? 'Knock down the drones by the waterfall 🎯' : 'Climb the second vine up the falls') :
-      s === 1 ? (G.freed < 3 || alive(3) || alive(4) || alive(5) ? `Enter the Edakkal caves — free the last animals (${G.freed}/3) 🏮` : !L.clue.found ? 'Find Mittu\'s trail in the cave (Q / 👃 SNIFF)' : 'Go deeper into the cave') :
+      s === 1 ? (G.freed < 3 || alive(3) || alive(4) || alive(5) ? `Enter the Edakkal caves — free the last animals (${G.freed}/3) 🏮` : !L.clue.found ? 'Find Mittu\'s trail in the cave (Q / 👃 SNIFF)' : !L.key.got && !(G.keys > 0) ? 'Kaala\'s key is on the stone altar — grab it! 🔑' : L.boulder.on ? 'RUN to the gate! 🪨💨' : 'Unlock the gate to Kaala\'s lair 🔑') :
       s === 2 ? 'Kaala\'s lair is ahead. Mittu is waiting! 🐾' : 'FINAL BATTLE: Defeat Kaala!');
   },
 
@@ -212,12 +243,13 @@ const level = {
     if (L.l2.locked && !alive(2) && !L.l1.locked && P.pos.z < C1) { L.l2.locked = false; sfx.big(); popText('Drones down! 💦'); }
   },
   checkGate() {
-    if (G.stage === 1 && G.freed >= 3 && L.clue.found && !alive(3) && !alive(4) && !alive(5) && !L.gates.g.open) {
-      L.gates.g.openUp(); G.stage = 2; setCP(L, pathX(GZ - 2), GZ - 2); sfx.big(); popText('Every animal is safe! 🐾');
+    if (G.stage === 1 && L.key.hidden && G.freed >= 3 && L.clue.found && !alive(3) && !alive(5)) { L.key.reveal(); dialog('Pichu', 'Look — a key on that stone altar! That must open Kaala\'s gate.', 3.5); this.objective(); }
+    if (G.stage === 1 && L.gates.g.open) {
+      L.boulder.stop(); G.stage = 2; setCP(L, pathX(GZ - 2), GZ - 2); sfx.big(); popText('Every animal is safe! 🐾');
       dialog('Pichu', 'That\'s Mittu crying! She\'s right through there. Hold on, Mittu — we\'re coming!', 4); puppyWhine(.2); this.objective();
     }
   },
-  action() { tryFreeCage(L, c => alive(c.guard) > 0); this.checkGate(); this.objective(); },
+  action() { if (tryInteract(L)) { this.checkGate(); this.objective(); return; } tryFreeCage(L, c => alive(c.guard) > 0); this.checkGate(); this.objective(); },
 
   onPhase(n) {
     if (n === 2) setTimeout(() => dialog('Ranger Ammini (radio)', MOBILE ? 'Pichu! Only one Kaala is real. Tap 🐶 BARK — Honey will scare away the fakes!' : 'Pichu! Only one Kaala is real. Press H — Honey\'s BARK will scare away the fakes!', 5), 2500);
@@ -270,7 +302,11 @@ const level = {
     if (P.pos.z < 114) wakeGroup(1);
     if (P.pos.z < C1) { wakeGroup(2); this.unlock(); }
     if (P.pos.z < 56) wakeGroup(3);
-    if (P.pos.z < 10) wakeGroup(4);
+    if (!L.puzzleMsg && G.stage >= 1 && P.pos.z < CAVE + 14) { L.puzzleMsg = true; dialog('Pichu', 'A stone door, and four old torches with signs on them… The carving above the door shows an order!', 4.5); }
+    if (L.doorOpen && L.doorT < 2) { L.doorT += dt; L.door.position.y -= dt * 3.4; if (L.doorT >= 2) L.door.visible = false; }
+    // rolling boulder chase; reach the gate with the key and it unlocks by itself
+    L.boulder.update(dt, () => { L.boulder.stop(); FLOW.respawn(L.keySpot, () => { dialog('Pichu', 'Too slow! Run as soon as it starts rolling!', 2.5); setTimeout(() => L.boulder.start(), 1500); }); });
+    if (G.keys > 0 && Math.hypot(P.pos.x - pathX(GZ), P.pos.z - GZ) < 4 && !L.gates.g.open) { L.gates.g.use(); this.checkGate(); }
     if (P.pos.z < -20) wakeGroup(5);
     if (G.stage === 0 && !L.l2.locked && P.pos.z < C2 - 2) { G.stage = 1; }
     if (!L.caveMsg && P.pos.z < CAVE) { L.caveMsg = true; dialog('Pichu', 'It\'s so dark in here… good thing I have my lantern. Look at those old carvings on the walls!', 4); }
