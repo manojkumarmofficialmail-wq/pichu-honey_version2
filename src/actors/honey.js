@@ -67,7 +67,11 @@ export function updateHoney(dt, t) {
     const np = { x: HN.pos.x + Math.sin(HN.yaw) * HN.speed * dt, z: HN.pos.z + Math.cos(HN.yaw) * HN.speed * dt };
     if (HN.lunge > 0) { np.x += Math.sin(HN.yaw) * 4 * dt; np.z += Math.cos(HN.yaw) * 4 * dt; }
     collide(np, .25);
+    const hx0 = HN.pos.x, hz0 = HN.pos.z;
     if (W.walkable(np.x, np.z)) { HN.pos.x = np.x; HN.pos.z = np.z; }
+    HN.moved = Math.hypot(HN.pos.x - hx0, HN.pos.z - hz0);
+    // stuck behind water or a wall (following or chasing a poacher): hop over next to Pichu
+    { const dp = Math.hypot(P.pos.x - HN.pos.x, P.pos.z - HN.pos.z); if (dp > 6 && HN.moved < .02) { HN.stuckT = (HN.stuckT || 0) + dt; if (HN.stuckT > 1.5 && P.ground && !P.plat) { HN.stuckT = 0; placeHoney(P.pos.x - Math.sin(P.yaw) * 1.3, P.pos.z - Math.cos(P.yaw) * 1.3, P.yaw); } } else HN.stuckT = 0; }
     HN.pos.y = W.height(HN.pos.x, HN.pos.z);
     HN.mode = HN.speed > .3 ? 'walk' : tgt ? 'crouch' : (P.speed < .2 ? 'sit' : 'alert');
     if ((HN.sniffT || 0) > 0) { HN.sniffT -= dt; if (HN.speed < 1) HN.mode = 'sniff'; }

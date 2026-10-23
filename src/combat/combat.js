@@ -35,7 +35,7 @@ function autoFace(maxD = 3.6) {
   const inp = inputDir(); const want = inp.mag > .2 ? Math.atan2(inp.x, inp.z) : P.yaw;
   let best = null, bd = 1e9;
   for (const e of ENEMIES) {
-    if (!e.alive || e.friendly) continue; const dx = e.x - P.pos.x, dz = e.z - P.pos.z, d = Math.hypot(dx, dz);
+    if (!e.alive || e.friendly || e.noAim) continue; const dx = e.x - P.pos.x, dz = e.z - P.pos.z, d = Math.hypot(dx, dz);
     if (d > maxD + e.radius) continue; const a = Math.abs(angDiff(want, Math.atan2(dx, dz))); if (a > 2.0) continue;
     const score = d + a * 1.5; if (score < bd) { bd = score; best = e; }
   }
@@ -95,7 +95,7 @@ function slingTarget() {
   // aim at the closest enemy in front of the camera / player
   const fx = -Math.sin(CAM.yaw), fz = -Math.cos(CAM.yaw), f = fwd(); let best = null, bs = 1e9;
   for (const e of ENEMIES) {
-    if (!e.alive || e.friendly) continue; const dx = e.x - P.pos.x, dz = e.z - P.pos.z, d = Math.hypot(dx, dz);
+    if (!e.alive || e.friendly || e.noAim) continue; const dx = e.x - P.pos.x, dz = e.z - P.pos.z, d = Math.hypot(dx, dz);
     if (d > 24 || d < .5) continue; const c = Math.max((dx * fx + dz * fz) / d, (dx * f.x + dz * f.z) / d); if (c < .6) continue;
     const s = d * (1.6 - c); if (s < bs) { bs = s; best = e; }
   }
@@ -270,14 +270,22 @@ export function updatePlayer(dt) {
   const rise = gN.h - P.pos.y;
   if (P.ground && step > 1e-5 && rise > .05 && (rise > .45 || rise / step > 1.5)) { np.x = ox; np.z = oz; tryLadder(inp); }
   // keep out of deep water (unless standing on a raft)
-  if (!gN.plat && !W.walkable(np.x, np.z)) { np.x = ox; np.z = oz; }
+  // can't WALK into deep water, but can jump out over it (log hopping)
+  if (!gN.plat && !W.walkable(np.x, np.z) && P.ground) { np.x = ox; np.z = oz; }
   P.pos.x = np.x; P.pos.z = np.z;
   if (P.ground && P.plat) { P.pos.x += P.plat.dx; P.pos.z += P.plat.dz; }
   P.vy -= 20 * dt; P.pos.y += P.vy * dt;
   const g = groundAt(P.pos.x, P.pos.z, P.pos.y), h = g.h;
   if (P.pos.y <= h) { if (!P.ground && P.vy < -4) { sfx.land(); P.landT = .15; } P.pos.y = h; P.vy = 0; P.ground = true; P.plat = g.plat; }
   else if (P.vy <= 0 && P.ground && P.pos.y - h < .35) { P.pos.y = h; P.vy = 0; P.plat = g.plat; } else { P.ground = false; P.plat = null; }
-  if (P.ground) { P.airT = 0; if (!P.plat) P.lastSafe.copy(P.pos); } else P.airT += dt;
+  // landed in deep water: splash, lose a little health, back to the last safe spot
+  if (P.ground && !P.plat && !W.walkable(P.pos.x, P.pos.z)) {
+    sfx.splash(); emit(TEX.puff, P.pos.clone().setY(W.water + .2), 18, { color: 0xdff4ff, size: .4, speed: 3, g: -9, life: .8, spread: .2 }); buzz(100);
+    P.pos.copy(P.lastSafe); P.vy = 0; P.kb.set(0, 0, 0); P.act = null;
+    if (P.invul <= 0) { P.hp = Math.max(1, P.hp - 6); P.invul = 1; hud(); }
+    dialog('Pichu', pick(['Splash! Brrr, cold water!', 'Whoops! Jump when the log is close!', 'Splashy splash! Try again, Pichu!']), 2.2);
+  }
+  if (P.ground) { P.airT = 0; if (!P.plat && W.walkable(P.pos.x, P.pos.z)) P.lastSafe.copy(P.pos); } else P.airT += dt;
   if (P.jumpBuf > 0) { P.jumpBuf -= dt; if (P.ground) doJump(); }
   // stamina regen
   if (!A || A.type === 'sling') P.stamina = Math.min(100, P.stamina + dt * (P.speed > 5 ? 8 : 30));

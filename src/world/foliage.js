@@ -39,6 +39,8 @@ export class Flora {
   fern(x, y, z, s = 1) { this.push('fern', { x, y, z, ry: sr(0, TAU), s, c: hsl(sr(.25, .32), .5, sr(.2, .3)) }); }
   bush(x, y, z, s = 1, c) { this.push('bush', { x, y: y + s * .3, z, ry: sr(0, TAU), sx: s * 1.2, sy: s * .75, sz: s * 1.1, c: c || hsl(sr(.24, .32), .45, sr(.18, .28)) }); }
   tea(x, y, z, s = 1, ry = 0) { this.push('tea', { x, y: y + .15 * s, z, ry, sx: s * 1.1, sy: s * .55, sz: s * .7, c: hsl(sr(.25, .3), sr(.55, .7), sr(.3, .4)) }); }
+  // teak: tall straight pale trunk, a crown of big flat leaves (Nilambur's famous trees)
+  teak(x, y, z, s = 1) { const ry = sr(0, TAU); this.push('teakT', { x, y: y - .1, z, ry, s, c: hsl(.08, sr(.12, .2), sr(.42, .52)) }); this.push('teakF', { x, y: y - .1, z, ry, s, c: hsl(sr(.2, .26), sr(.4, .55), sr(.24, .32)) }); addOb(x, z, .35 * s, 2.2 * s); }
   silverOak(x, y, z, s = 1) { const ry = sr(0, TAU); this.push('oakT', { x, y: y - .1, z, ry, s, c: hsl(.08, .15, sr(.35, .45)) }); this.push('oakF', { x, y: y - .1, z, ry, s, c: hsl(sr(.2, .26), .35, sr(.28, .36)) }); addOb(x, z, .2 * s, 1.6 * s); }
   kurinji(x, y, z, s = 1) { this.push('kur', { x, y: y + .25 * s, z, ry: sr(0, TAU), sx: s * .7, sy: s * .45, sz: s * .7, c: hsl(sr(.72, .78), sr(.45, .65), sr(.5, .62)) }); }
   grass(x, y, z, h, c) { this.push('grass', { x, y: y - .02, z, ry: sr(0, PI), rx: sr(-.2, .2), rz: sr(-.2, .2), sx: sr(.55, .95), sy: h, sz: 1, c }); }
@@ -58,6 +60,7 @@ export class Flora {
     if (L.grass) inst(G.grass, G.grassMat, L.grass, root, false, true);
     if (L.tea) inst(G.bush, G.teaMat, L.tea, root, true, true);
     if (L.oakT) { inst(G.oakT, white, L.oakT, root); inst(G.oakF, G.leafMat, L.oakF, root); }
+    if (L.teakT) { inst(G.teakT, white, L.teakT, root); inst(G.teakF, G.leafMat, L.teakF, root); }
     if (L.kur) inst(G.bush, G.kurMat, L.kur, root, false, true);
     this.L = {};
   }
@@ -83,10 +86,13 @@ export class Flora {
     grass.setAttribute('color', new THREE.Float32BufferAttribute([.55, .55, .55, .55, .55, .55, .82, .78, .78, .78, .78, .78, 1.05, 1.05, 1.05, 1.05, 1.05, 1.05, 1.25, 1.25, 1.25], 3));
     grass.setIndex([0, 1, 2, 2, 1, 3, 2, 3, 4, 4, 3, 5, 4, 5, 6]); shared(grass);
     const oakT = shared(new THREE.CylinderGeometry(.12, .2, 11, 6).translate(0, 5.5, 0));
+    const teakT = shared(mergeGeometries([new THREE.CylinderGeometry(.22, .38, 13, 8).translate(0, 6.5, 0), new THREE.CylinderGeometry(.06, .1, 2.4, 5).rotateZ(-.9).translate(.9, 11.5, 0), new THREE.CylinderGeometry(.06, .1, 2.2, 5).rotateZ(.9).translate(-.8, 12, .2)]));
+    const leaf = (x, y, z, r) => new THREE.IcosahedronGeometry(r, 0).scale(1.4, .35, 1.2).rotateY(x * 3 + z).translate(x, y, z);
+    const teakF = shared(mergeGeometries([leaf(0, 13.2, 0, 1.9), leaf(1.6, 12.3, .5, 1.4), leaf(-1.5, 12.6, -.4, 1.4), leaf(.3, 14.3, .2, 1.3), leaf(-.4, 12, 1.5, 1.2), leaf(.6, 12.1, -1.5, 1.2), leaf(2.2, 11.4, -.8, .9)]));
     const oakF = shared(mergeGeometries([blob(1.2, 0, 10, 0), blob(1, .5, 8.8, .3), blob(1, -.4, 9, -.3), blob(.9, 0, 11.2, 0), blob(.8, .3, 7.6, -.4)]).scale(1, 1.1, 1));
     const sm = m => { m.userData.shared = true; return m; };
     Flora._g = {
-      oakT, oakF, palm, areca: ar, rainT, rainF, bambooS, bambooL, banT, banL, rock, fern, bush, grass,
+      teakT, teakF, oakT, oakF, palm, areca: ar, rainT, rainF, bambooS, bambooL, banT, banL, rock, fern, bush, grass,
       frondMat: sm(windify(new THREE.MeshStandardMaterial({ color: 0xffffff, side: THREE.DoubleSide, roughness: .8 }), .004, 5)),
       leafMat: sm(windify(new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true, roughness: .85 }), .002, 7)),
       leafMat2: sm(windify(new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true, roughness: .85 }), .006, 2)),
