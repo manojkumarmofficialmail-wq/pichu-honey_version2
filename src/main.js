@@ -78,11 +78,12 @@ FLOW.complete = () => {
   SAVE.unlocked = Math.max(SAVE.unlocked, LV.id + 1); saveBest();
   const gained = depositPods(LV.id, G.pods);
   const next = LEVELS.find(l => l.id === LV.id + 1);
-  $('endInner').innerHTML = `<h1>Level Complete!</h1><h2>${def.icon} ${def.name} · ${DV.icon} ${DV.name}</h2>
+  const fin = !!LV.final;
+  $('endInner').innerHTML = `<h1>${fin ? 'The End 🐾' : 'Level Complete!'}</h1>${fin ? '<p class="soon">🏆 <b>You brought Mittu home and saved the forests of Kerala!</b><br>From Agasthyamala to Wayanad — thank you for playing Pichu &amp; Honey 2.</p>' : ''}<h2>${def.icon} ${def.name} · ${DV.icon} ${DV.name}</h2>
    <div class="stars">${'⭐'.repeat(stars)}${'☆'.repeat(3 - stars)}</div>${isRec && old ? '<div id="newRec">🎉 New best time!</div>' : ''}
    <div class="stats"><div><b>${fmtTime(G.time)}</b><span>Time</span></div><div><b>${G.kos}</b><span>Poachers beaten</span></div><div><b>${G.freed}</b><span>Animals freed</span></div><div><b>${G.pods}/${G.podsTotal}</b><span>Cardamom</span></div></div>
    <div class="badges">${B.map(b => `<span class="badge${b[3] ? ' got' : ''}" title="${b[2]}">${b[0]} ${b[1]}</span>`).join('')}</div>
-   ${G.clueIcon ? `<p class="bank">${G.clueIcon} ${G.clue ? 'Clue found — Mittu\'s trail leads further north!' : 'You missed the clue this time.'}</p>` : ''}
+   ${G.clueIcon ? `<p class="bank">${G.clueIcon} ${G.clue ? (fin ? 'You followed Mittu\'s trail all the way!' : 'Clue found — Mittu\'s trail leads further north!') : 'You missed the clue this time.'}</p>` : ''}
    <p class="bank">🌿 ${gained ? `+${gained} cardamom pods added to your bag! ` : ''}You have <b>${BANK.pods}</b> pods to spend.</p>
    ${next ? (next.load ? `<button class="btn" id="nextBtn">▶ Next: ${next.name}</button>` : `<p class="soon">${next.icon} <b>Next stop: ${next.name}</b> (${next.place}) arrives in the next update!</p>`) : ''}
    <button class="btn sec" id="shopBtn2">🛒 Upgrades</button> <button class="btn sec" id="againBtn">↻ Play Again</button> <button class="btn sec" id="mapBtn">🗺️ Level Map</button>`;

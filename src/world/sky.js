@@ -50,6 +50,8 @@ const ENV_RAW = {
   summit:    { top: 0x2a5aa8, hor: 0xf4d8c0, sun: 0xffc890, sunI: 3.0, hs: 0xf0e0f0, hg: 0x55506a, hI: 1.1,  fog: 0xe8d4cc, fn: 30, ff: 160, el: 10, az: 210, stars: 0, night: 0, exp: 1.04, cloud: 0xffe0c8, co: .95, water: 0x6a7a9a },
   monsoon:   { top: 0x4a5866, hor: 0x8a98a2, sun: 0xc8d0d8, sunI: 1.3, hs: 0xb8c4cc, hg: 0x3a4a32, hI: 1.15, fog: 0x7a8890, fn: 10, ff: 70,  el: 50, az: 150, stars: 0, night: 0, exp: 1.05, cloud: 0x6a747c, co: .9, water: 0x4a5a5a },
   rainNight: { top: 0x101a26, hor: 0x2a3a4a, sun: 0x9ab0d0, sunI: .7, hs: 0x6a7aa0, hg: 0x1e2630, hI: .85, fog: 0x1a2430, fn: 8,  ff: 60,  el: 30, az: 180, stars: 0, night: 1, exp: 1.35, cloud: 0x1e2630, co: .5, water: 0x1a2430 },
+  cave:      { top: 0x0e0a08, hor: 0x2a1e16, sun: 0xffb070, sunI: .55, hs: 0x8a6a50, hg: 0x2a1e14, hI: .75, fog: 0x1a120c, fn: 6, ff: 46, el: 60, az: 160, stars: 0, night: .7, exp: 1.25, cloud: 0x2a2018, co: 0, water: 0x1a2a30 },
+  coffee:    { top: 0x5a9ad8, hor: 0xe8e4d4, sun: 0xfff0d0, sunI: 3.0, hs: 0xe4f0ff, hg: 0x5a6a3a, hI: 1.15, fog: 0xdce4dc, fn: 36, ff: 170, el: 26, az: 120, stars: 0, night: 0, exp: 1.02, cloud: 0xffffff, co: .9, water: 0x3a8aa8 },
   night:     { top: 0x040817, hor: 0x1a2850, sun: 0xa9c0ff, sunI: .95, hs: 0x5a6cb0, hg: 0x1a2030, hI: .6,  fog: 0x131c38, fn: 16, ff: 105, el: 24, az: 182, stars: 1, night: 1, exp: 1.18, cloud: 0x2a3550, co: .35, water: 0x162040 },
 };
 const COLK = ['top', 'hor', 'sun', 'hs', 'hg', 'fog', 'cloud', 'water'];
